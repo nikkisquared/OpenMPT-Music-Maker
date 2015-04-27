@@ -3,7 +3,6 @@
 """Class objects defining aspects of a tracker production"""
 
 from copy import deepcopy
-from userinput import convert_to_hex
 
 
 def plural(value):
@@ -13,11 +12,24 @@ def plural(value):
 
 class Channel(object):
 
-    def __init__(self, instruments=[], effects=[], spacing=[[0, 0], [0, 0]],
-                useGlobals=[True, True], overwrite=False, muted=False):
+    def __init__(self, instruments=[], volumes=[], effects=[],
+                spacing=[[0, 0], [0, 0], [0, 0]],
+                useGlobals=[True, True, True],
+                overwrite=False, muted=False):
+
         self.instruments = list(instruments)
+        # stores a tuple of instrument data during production 
+        self.nextInstrument = None
+        # keeps track of changing the SA for Instrument Offsets
+        self.currentSA = 0
+        self.nextSA = 0
+
+        self.volumes = list(volumes)
         self.effects = list(effects)
         self.spacing = deepcopy(spacing)
+        # spacing to tick through during production
+        self.currentSpacing = [0, 0, 0]
+
         self.useGlobals = list(useGlobals)
         self.overwrite = overwrite
         self.muted = muted
@@ -81,17 +93,19 @@ class Instrument(object):
 
 class Octave(object):
 
-    def __init__(self, pitch=5, keys=[]):
+    def __init__(self, pitch=5,
+                keys=["C-", "C#", "D-", "D#", "E-", "F-",
+                    "F#", "G-", "G#", "A-", "A#", "B-"]):
         self.pitch = pitch
         self.keys = list(keys)
         self.usedBy = []
 
     def __str__(self):
         info = "Pitch %s. " % self.pitch
-        if self.keys:
-            info += "It is limited to the %s keys." % (self.keys)
-        else:
+        if self.keys == Octave.__init__.keys:
             info += "It uses the full octave."
+        else:
+            info += "It is limited to the %s keys." % (self.keys)
         if self.usedBy:
             n = len(self.usedBy)
             info += " Used by %s Instrument%s." % (n, plural(n))
@@ -111,7 +125,7 @@ class Effect(object):
 
         vr = self.valueRange
         info = "Effect %s. " % self.effect
-        vr = (convert_to_hex(vr[0]), convert_to_hex(vr[1]))
+        vr = ("%X" % vr[0], "%X" % vr[1])
         if vr[0] == vr[1]:
             info += "The value is always %s." % vr[0]
         else:
@@ -165,9 +179,9 @@ class Offset(Effect):
         
         vr = []
         for value in self.valueRange:
-            vr.append(convert_to_hex(value).zfill(2))
+            vr.append(("%X" % value).zfill(2))
         sa = self.sampleArea
-        sa = (convert_to_hex(sa[0]), convert_to_hex(sa[1]))
+        sa = ("%X" % sa[0], "%X" % sa[1])
 
         if sa[0] == sa[1]:
             info = "The Sample Area is always %s." % sa[0]

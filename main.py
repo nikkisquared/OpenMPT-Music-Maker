@@ -5,17 +5,12 @@ from __future__ import print_function
 """A Note and Effect randomizer for OpenMPT"""
 
 import random
+import pickle
 import copy
 
 import interface
 import userinput as ui
 import tracker
-
-
-INSTRUMENT_MAP = list("0123456789:;<=>?@ABCDEFGHI")
-#print("%s%s" % (INSTRUMENT_MAP[x / 10], x % 10))
-FULL_TITLES = {"C": "Channels", "I": "Instruments", "O": "Octaves",
-                "V": "Volumes", "E": "Effects", "F": "Offsets"}
 
 
 def print_db(database):
@@ -25,16 +20,7 @@ def print_db(database):
             print("  %s" % database[key])
         else:
             for thing in database[key]:
-                print("  %s" % thing)
-
-def testing():
-    database["Octaves"].append(interface.make_octave())
-    database["Volumes"].append(interface.make_volume())
-    database["Offsets"].append(interface.make_offset())
-    database["Instruments"].append(interface.make_instrument(database))
-    database["Effects"].append(interface.make_effect())
-    database["Channels"].append(interface.make_channel(database))
-    print_db(database)
+                print("  %r" % thing)
 
 
 def choose_structure():
@@ -82,15 +68,15 @@ def view_db(database, thing, title, useGlobals):
         globalNote = ""
     pages = interface.paginate(db[title])
     if pages[0] == []:
-        msg = "There are no %s%s to view. Press any key to continue."
-        ui.get_input(msg % (globalNote, title))
+        prompt = "There are no %s%s to view. Press any key to continue."
+        ui.get_input(prompt % (globalNote, title))
         return None
 
-    c = ""
+    choice = ""
     curPage = 1
     header = "\nViewing Page %s of " + globalNote + title
 
-    while c != "B":
+    while choice != "B":
         print(header % curPage)
         for item in pages[curPage - 1]:
             print(item)
@@ -104,9 +90,7 @@ def view_db(database, thing, title, useGlobals):
         if curPage < len(pages):
             prompt += "\tGo to (N)ext Page"
             valid.append("N")
-        c = ui.get_choice(prompt, valid)
-
-    print_db(database)
+        choice = ui.get_choice(prompt, valid)
 
 
 def edit_db(database, thing, title, useGlobals):
@@ -132,22 +116,58 @@ def arrange_db(database):
     prompt = "Do you want to move (T)o or (F)rom the Globals database?"
     valid = list("TF")
     while True:
-        c = choose_structure()
-        if c == "B":
+        choice = choose_structure()
+        if choice == "B":
             return None
         where = get_choice(prompt, valid)
 
 
-def handle_things(c, database, useGlobals):
+def database_actions(choice, database, useGlobals):
     """Middle function for performing actions on the database"""
+    full_titles = {"C": "Channels", "I": "Instruments", "O": "Octaves",
+                "V": "Volumes", "E": "Effects", "F": "Offsets"}
     functions = {"A": add_to_db, "D": delete_from_db,
                 "V": view_db, "E": edit_db}
     structure = choose_structure()
     if structure == "B":
         return None
-    functions[c](database, structure, FULL_TITLES[structure], useGlobals)
-    if c != "V" and ui.get_binary_choice("Again? Y/N"):
-        handle_things(c, database, useGlobals)
+    functions[choice](database, structure, full_titles[structure], useGlobals)
+    if choice != "V" and ui.get_binary_choice("Repeat action? Y/N"):
+        database_actions(choice, database, useGlobals)
+
+
+def save_database(database):
+    """Save the database to a file"""
+    prompt = "Enter the name of the file to save to."
+    filename = ui.get_filename(prompt, 'w')
+    if filename:
+        with open(filename, 'w') as outfile:
+            pickle.dump(database, outfile)
+    else:
+        print("No file to save to.")
+
+
+def load_database(database):
+    """Load a file into or over the database"""
+
+    prompt = "Enter the name of a file to load from."
+    filename = ui.get_filename(prompt, 'r')
+    if not filename:
+        print("No file to load from.")
+        return None
+    with open(filename, 'r') as infile:
+        newDatabase = pickle.load(infile)
+
+    prompt = "(O)verwrite Database, or (A)ppend to it?"
+    if ui.get_binary_choice(prompt, list("OA"), "O", False):
+        print("Overwriting database.")
+        database.update(newDatabase)
+    else:
+        structures = ("Channels", "Instruments", "Octaves",
+                        "Effects", "Volumes", "Offsets")
+        for key in structures:
+            database[key] += newDatabase[key]
+            database["Globals"][key] += newDatabase["Globals"][key]
 
 
 def main():
@@ -158,37 +178,42 @@ def main():
             "(A)dd Things\t(D)elete Things\n"
             "(V)iew Things\t(E)dit Things\n"
             "(M)ove Things\t(G)lobals Switch\n"
+            # ie decimal/hex/default
             "(B)ase Switch\n"
-            "(P)arse Args\n"
+            "(P)arse Args\t(?)Batch Operations\n"
             "(S)ave File\t(L)oad File\n"
             "(Q)uit")
-    valid = list("RTADVEMGBPSLQ")
+    valid = list("RTADVEGMBPSLQ")
 
     database = {"Channels": [], "Instruments": [], "Octaves": [],
                 "Effects": [], "Volumes": [], "Offsets": []}
     database["Globals"] = copy.deepcopy(database)
     useGlobals = False
 
-    c = ""
-    while c != "Q":
-        c = ui.get_choice(prompt, valid)
+    choice = ""
+    while choice != "Q":
+        choice = ui.get_choice(prompt, valid)
 
-        if c == "Q":
+        if choice == "Q":
             continue
-        elif c == "R":
-            f = ui.get_file("w")
-            tracker.produce(f)
-        elif c in "ADVE":
-            handle_things(c, database, useGlobals)
-        elif c == "M":
+        elif choice == "R":
+            tracker.produce(database)
+        elif choice in "ADVE":
+            database_actions(choice, database, useGlobals)
+        elif choice == "M":
             arrange_db(database)
-        elif c == "G":
+        elif choice == "G":
             useGlobals = not useGlobals
             if useGlobals:
-                print("Now using Globals.")
+                print("Now working on Globals.")
             else:
-                print("No longer using Globals.")
+                print("No longer working on Globals.")
+        elif choice == "S":
+            save_database(database)
+        elif choice == "L":
+            load_database(database)
         else:
-            print("You chose %s, which hasn't been implemented yet :(" % c)
+            msg = "You chose %s, but it hasn't been implemented yet :("
+            print(msg % choice)
 
 main()

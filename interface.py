@@ -43,8 +43,8 @@ def make_channel(database):
 def edit_channel(database, channel):
     """Let the user edit an existing Channel"""
 
-    addTo = (channel.instruments, channel.effects)
-    for pos, term in enumerate(["Instruments", "Effects"]):
+    addTo = (channel.instruments, channel.effects, channel.volumes)
+    for pos, term in enumerate(["Instruments", "Volumes", "Effects"]):
 
         if ui.get_binary_choice("Add %s? Y/N" % term):
             chosen = ui.make_mult_choice(
@@ -63,10 +63,18 @@ def edit_channel(database, channel):
         if ui.get_binary_choice(prompt):
             channel.useGlobals[pos] = not channel.useGlobals[pos]
 
-    prompt = "Turn %s overwriting? It's currently %s."
+    prompt = "Turn %s overwriting? It's currently %s. Y/N"
     prompt %= ("off", "on") if channel.overwrite else ("on", "off")
-    if ui.get_binary_choice("%s Y/N" % prompt):
+    if ui.get_binary_choice(prompt):
         channel.overwrite = not channel.overwrite
+
+    prompt = "%s the Channel? It's currently %s. Y/N"
+    if channel.muted:
+        prompt %= ("Unmute", "muted")
+    else:
+        prompt %= ("Mute", "unmuted")
+    if ui.get_binary_choice(prompt):
+        channel.muted = not channel.muted
 
     return channel
 
@@ -118,8 +126,7 @@ def edit_octave(octave):
     """Let the user edit an existing Octave"""
     prompt = "Enter a pitch for the Octave. Currently it's %s."
     octave.pitch = ui.get_number(prompt % octave.pitch, 0, 9)
-    prompt = "%s key limits? Y/N"
-    prompt %= "Change" if octave.keys else "Add"
+    prompt = "Change key limits? Y/N"
     if ui.get_binary_choice(prompt):
         #octave.keys = get_octave_keys()
         print("NEED TO IMPLEMENT")

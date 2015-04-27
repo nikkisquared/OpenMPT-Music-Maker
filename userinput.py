@@ -4,76 +4,80 @@ from __future__ import print_function
 
 """Handles all non-arg user input"""
 
-INT_HIGH = float("inf")
+import os
+
+INFINITY = float("inf")
 
 
-def get_input(msg, upper=True):
-    """Prompt user with msg and return their response in uppercase"""
-    response = raw_input("\n" + msg + "\n").strip()
+def get_input(prompt, upper=True):
+    """Prompt user and return their response in uppercase"""
+    response = raw_input("\n" + prompt + "\n").strip()
     return response.upper() if upper else response
 
 
-def get_choice(msg, valid):
-    """Prompt the user with msg until they enter a valid option"""
-    c = get_input(msg)
+def get_choice(prompt, valid):
+    """Prompt the user until they enter a valid option"""
+    c = get_input(prompt)
     while c not in valid:
         print("You entered %s which is not a valid option." % c,
                 "\nEnter one of %s." % valid)
-        c = get_input(msg)
+        c = get_input(prompt)
     return c
 
 
-def get_binary_choice(msg, valid=["Y", "N"], wanted="Y"):
-    """Get a response to a binary choice from the user"""
-    valid.append("")
-    return get_choice(msg, valid).startswith(wanted)
-
-
-def get_mult_choice(msg, valid, options, exit):
+def get_binary_choice(prompt, valid=["Y", "N"], wanted="Y", skip=True):
     """
-    Prompt the user with msg and let them keep toggling
+    Get a response to a binary choice from the user
+    skip lets user skip choice by entering nothing, if true
+    """
+    if skip:
+        valid.append("")
+    return get_choice(prompt, valid).startswith(wanted)
+
+
+def get_mult_choice(prompt, valid, options, exit):
+    """
+    Prompt the user and let them keep toggling
     various valid options until they enter the exit char
     """
     valid.append(exit)
-    valid.append("")
-    c = get_choice(msg, valid)
+    c = get_choice(prompt, valid)
     status = ""
     while c != exit:
         # toggle the chosen option
         options[c] = not options[c]
         status = "on" if options[c] else "off"
         print("Option %s is now %s." % (c, status))
-        c = get_choice(msg, valid)
+        c = get_choice(prompt, valid)
 
 
-def make_mult_choice(msg, options, exit="", default=False, single=False):
-    """Wrapper for calling get_mult_choice with a generic list"""
+def make_mult_choice(prompt, options, exit="", default=False, single=False):
+    """
+    Wrapper for making a multiple choice prompt from a generic list
+    Defaults to using get_mult_choice and returns all True items, 
+    but if single is True, it will use get_choice and return only one
+    """
 
     bools = {}
-    valid = [""]
+    valid = []
     for x, option in enumerate(options, 1):
-        msg += "\n%s) %s" % (x, option)
+        prompt += "\n%s) %s" % (x, option)
         x = str(x)
         bools[x] = default
         valid.append(x)
 
     if single:
-        chosen = get_choice(msg, valid)
-            # enumerate gave an offset of 1
+        chosen = get_choice(prompt, valid)
+        # enumerate gave an offset of 1
         return options[int(x) - 1]
     else:
-        get_mult_choice(msg, valid, bools, exit)
+        get_mult_choice(prompt, valid, bools, exit)
         chosen = []
         for x, status in bools.items():
             if status:
                 # enumerate gave an offset of 1
                 chosen.append(options[int(x) - 1])
         return chosen
-
-
-def convert_to_hex(value):
-    """Convert value to hex format"""
-    return hex(value).upper().split("X")[1]
 
 
 def convert_to_int(value, getHex=False):
@@ -83,30 +87,32 @@ def convert_to_int(value, getHex=False):
             return int(value, 16)
         except:
             print("Could not parse %s as a hex value." % value)
-    elif value.isdigit():
-        return int(value)
     else:
-        print("Could not parse %s as an int value." % value)
-    return None
+        if value.isdigit():
+            return int(value)
+        else:
+            print("Could not parse %s as an int value." % value)
         
 
-def get_number(msg, low=0, high=INT_HIGH, getHex=False):
+def get_number(prompt, low=0, high=INFINITY, getHex=False):
     """
-    Prompt user with msg until they enter
-    a number of a valid type between or equal to low / high
+    Prompt user until they enter a number of a valid type
+    between or equal to low / high
+    Defaults to retrieving an integer, but setting getHex to True
+    will try to retrieve a hex character instead
     """
     error = "The %s is %s, but you entered %s."
     if getHex:
-        bounds = (convert_to_hex(low), convert_to_hex(high))
+        bounds = ("%X" % low, "%X" % high)
     else:
         bounds = (low, high)
-    if high == INT_HIGH:
-        msg += " It must be at least %s." % bounds[0]
+    if high == INFINITY:
+        prompt += " It must be at least %s." % bounds[0]
     else:
-        msg += " It must be within %s and %s." % (bounds)
+        prompt += " It must be within %s and %s." % (bounds)
 
     while True:
-        i = get_input(msg)
+        i = get_input(prompt)
         n = convert_to_int(i, getHex)
         if type(n) != int:
             continue
@@ -118,19 +124,23 @@ def get_number(msg, low=0, high=INT_HIGH, getHex=False):
             return n
 
 
-def get_range(msgs, low=0, high=INT_HIGH, current=[], getHex=False):
-    """Prompt the user with msgs to make a range between two values"""
+def get_range(prompts, low=0, high=INFINITY, current=[], getHex=False):
+    """
+    Prompt to make a range between two values
+    prompts is a list of two distinct messages for the
+    first and second values, respectively
+    """
     if len(current) == 2:
         for x in range(2):
-            msgs[x] += " Currently it's %s."
-            msgs[x] %= convert_to_hex(current[x]) if getHex else current[x]
-    first = get_number(msgs[0], low, high, getHex)
+            prompts[x] += " Currently it's %s."
+            prompts[x] %= "%X" % current[x] if getHex else current[x]
+    first = get_number(prompts[0], low, high, getHex)
     if first == high:
         print("\nYou entered the maximum value possible already, "
                 "so the range is complete.")
         second = first
     else:
-        second = get_number(msgs[1], first, high, getHex)
+        second = get_number(prompts[1], first, high, getHex)
     return [first, second]
 
 
@@ -139,8 +149,7 @@ def get_value_range(current, high, getHex):
     choicePrompt = "Change value range from %s-%s? Y/N"
     rangePrompt = "Enter the %s possible value"
     if getHex:
-        choicePrompt %= (convert_to_hex(current[0]),
-                        convert_to_hex(current[1]))
+        choicePrompt %= ("%X" % current[0], "%X" % current[1])
         rangePrompt += " in hex."
     else:
         choicePrompt %= current[0], current[1]
@@ -153,6 +162,33 @@ def get_value_range(current, high, getHex):
         return current
 
 
-def get_file(msg, mode):
-    """Prompt the user to choose a file to read or write to"""
-    pass
+def get_filename(prompt, mode):
+    """
+    Prompt the user to choose a file to read or write to,
+    returning the name of it
+    If the user declines to open any file, return None
+    """
+
+    existsPrompt = "File %s already exists. Overwrite? Y/N"
+    errorMsg = "File %s does not exist."
+    againPrompt = "Pick a different file? Y/N"
+    filename = None
+
+    while filename is None:
+        filename = raw_input("\n" + prompt + "\n").strip()
+        found = filename in os.listdir(".")
+
+        if mode == 'r' and not found:
+            print(errorMsg % filename)
+            if not get_binary_choice(againPrompt):
+                return None
+        elif mode == 'w' and found:
+            if get_binary_choice(existsPrompt % filename):
+                print("Overwriting %s." % filename)
+            else:
+                print("OK, I won't overwrite it.")
+                filename = None
+                if not get_binary_choice(againPrompt):
+                    return None
+
+    return filename

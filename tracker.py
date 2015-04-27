@@ -17,7 +17,6 @@ def get_random_value(valueRange):
     return random.randint(valueRange[0], valueRange[1])
 
 
-
 def tick_spacing(channel, pos):
     """
     Decrement spacing at given position
@@ -30,6 +29,7 @@ def tick_spacing(channel, pos):
         return True
     else:
         channel.currentSpacing[pos] -= 1
+        return False
 
 
 def get_random_child(children, globalChildren, useGlobals):
@@ -66,8 +66,9 @@ def format_offset(offset):
     if nextSA == offset.sampleArea[0]:
         low = offset.valueRange[0]
     if nextSA == offset.sampleArea[1]:
-        high == offset.valueRange[1]
-    value = "O%X" % get_random_value((low, high))
+        high = offset.valueRange[1]
+    roll = get_random_value((low, high))
+    value = "O" + ("%X" % roll).zfill(2)
 
     return nextSA, value
 
@@ -116,7 +117,8 @@ def get_volume(globalDB, source):
     if volume is None:
         return ""
     else:
-        return volume.effect + ("%X" % get_random_value(volume.valueRange))
+        value = str(get_random_value(volume.valueRange))
+        return volume.effect + value.zfill(2)
 
 
 def get_effect(globalDB, channel):
@@ -126,7 +128,8 @@ def get_effect(globalDB, channel):
     if effect is None:
         return ""
     else:
-        return effect.effect + ("%X" % get_random_value(effect.valueRange))
+        value = "%X" % get_random_value(effect.valueRange)
+        return effect.effect + value.zfill(2)
 
 
 def get_channel_line(database, channel):
@@ -141,11 +144,14 @@ def get_channel_line(database, channel):
     # Sample Area for the channel correctly
     if (channel.currentSpacing[0] <= 1 and
                 channel.nextSA != channel.currentSA):
+        channel.currentSpacing[0] -= 1
         channel.currentSA = channel.nextSA
-        return "|%sSA%x" % ((space * 8), channel.nextSA)
+        effect = "SA%X" % channel.nextSA
 
-    # if an Instrument is available, and should play now
-    if channel.nextInstrument != "" and tick_spacing(channel, 0):
+    # if the Sample Area doesn't need to be set for this line,
+    # an Instrument is available, and should play now
+    if (not effect and channel.nextInstrument != "" and
+            tick_spacing(channel, 0)):
         note, volume, effect = channel.nextInstrument
         channel.nextInstrument, channel.nextSA = get_instrument(
             database["Globals"], channel)
@@ -197,7 +203,7 @@ def produce(database):
 
     with open(filename, 'w') as outfile:
         # header required for OpenMPT to parse file
-        outfile.write("ModPlug Tracker  IT")
+        outfile.write("ModPlug Tracker  IT\n")
         for _ in xrange(lines):
             line = ""
             for channel in channels:

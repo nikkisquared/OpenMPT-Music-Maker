@@ -43,7 +43,7 @@ def make_channel(database):
 def edit_channel(database, channel):
     """Let the user edit an existing Channel"""
 
-    addTo = (channel.instruments, channel.effects, channel.volumes)
+    addTo = (channel.instruments, channel.volumes, channel.effects)
     for pos, term in enumerate(["Instruments", "Volumes", "Effects"]):
 
         if ui.get_binary_choice("Add %s? Y/N" % term):
@@ -143,10 +143,12 @@ def edit_volume(volume):
     prompt = "Enter a Volume Command."
     if volume.effect:
         prompt += " Currently it's %s." % volume.effect
-    volume.effect = ui.get_choice(prompt, list("VPABCDEFGH"))
-    high = 64 if volume.effect in "VP" else 9
+    volume.effect = ui.get_choice(prompt, list("VPABCDEFGH")).lower()
+    high = 64 if volume.effect in "vp" else 9
     if high == 9 and volume.valueRange[1] > 9:
         volume.valueRange[1] = 9
+    if volume.valueRange[0] > volume.valueRange[1]:
+        volume.valueRange[0] = volume.valueRange[1]
     volume.valueRange = ui.get_value_range(volume.valueRange, high, False)
     return volume
 

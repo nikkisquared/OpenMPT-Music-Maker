@@ -6,6 +6,7 @@ from __future__ import print_function
 
 import random
 import pickle
+import os
 import copy
 
 import interface
@@ -124,16 +125,17 @@ def arrange_db(database):
 
 def database_actions(choice, database, useGlobals):
     """Middle function for performing actions on the database"""
-    full_titles = {"C": "Channels", "I": "Instruments", "O": "Octaves",
-                "V": "Volumes", "E": "Effects", "F": "Offsets"}
+
     functions = {"A": add_to_db, "D": delete_from_db,
                 "V": view_db, "E": edit_db}
+    titles = {"C": "Channels", "I": "Instruments", "O": "Octaves",
+                "V": "Volumes", "E": "Effects", "F": "Offsets"}
+
     structure = choose_structure()
-    if structure == "B":
-        return None
-    functions[choice](database, structure, full_titles[structure], useGlobals)
-    if choice != "V" and ui.get_binary_choice("Repeat action? Y/N"):
-        database_actions(choice, database, useGlobals)
+    while structure != "B":
+        functions[choice](database, structure, titles[structure], useGlobals)
+        print("Repeating action.")
+        structure = choose_structure()
 
 
 def save_database(database):
@@ -141,6 +143,7 @@ def save_database(database):
     prompt = "Enter the name of the file to save to."
     filename = ui.get_filename(prompt, 'w')
     if filename:
+        os.remove(filename)
         with open(filename, 'w') as outfile:
             pickle.dump(database, outfile)
     else:

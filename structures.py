@@ -102,7 +102,8 @@ class Octave(object):
 
     def __str__(self):
         info = "Pitch %s. " % self.pitch
-        if self.keys == Octave.__init__.keys:
+        # compares the current keys to the full default
+        if self.keys == Octave.__init__.__defaults__[1]:
             info += "It uses the full octave."
         else:
             info += "It is limited to the %s keys." % (self.keys)
@@ -142,7 +143,7 @@ class Effect(object):
 class Volume(Effect):
 
     def __init__(self, effect="", valueRange=[0, 64]):
-        super(Volume, self).__init__(effect, valueRange)
+        super(Volume, self).__init__(effect.lower(), valueRange)
 
     def __str__(self):
         vr = self.valueRange
@@ -153,7 +154,7 @@ class Volume(Effect):
             info += "The value range is %s to %s." % (vr[0], vr[1])
         if self.usedBy:
             n = len(self.usedBy)
-            info += " Used by %s Instruments%s." % (n, plural(n))
+            info += " Used by %s Instrument%s." % (n, plural(n))
         else:
             info += " Not in use."
         return info

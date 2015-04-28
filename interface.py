@@ -82,32 +82,31 @@ def add_children_to_parent(parent, children):
     """
 
     parentType = type(parent)
-    childType = type(child)
+    childType = type(children[0])
+
+    if childType == structures.Instrument:
+        pointer = parent.instruments
+    if childType == structures.Octave:
+        pointer = parent.octaves
+    elif childType == structures.Effect:
+        pointer = parent.effects
+    elif childType == structures.Volume:
+        pointer = parent.volumes
+    elif childType == structures.Offset:
+        pointer = parent.offsets
 
     for child in children:
-
-        if not child or child in parent:
+        if not child or child in pointer:
             continue
-
-        if childType == structures.Instrument:
-            pointer = parent.instruments
-        if childType == structures.Octaves:
-            pointer = parent.volumes
-        elif childType == structures.Effects:
-            pointer = parent.effects
-        elif childType == structures.Volumes:
-            pointer = parent.volumes
-        elif childType == structures.Offsets:
-            pointer = parent.offsets
-
         pointer["local"].append(child)
-        if childType != structures.Volumes:
+
+        if childType != structures.Volume:
             child.usedBy.append(parent)
         else:
-            if parentType == structures.Instruments:
-                child.usedBy["Instruments"].append(parent)
+            if parentType == structures.Channel:
+                child.usedBy["Channels"].append(parent)
             else:
-                child.usedBy["Channel"].append(parent)
+                child.usedBy["Instruments"].append(parent)
 
 
 def configure_child(database, parent, childType):
@@ -141,7 +140,8 @@ def configure_child(database, parent, childType):
         chosen = ui.make_mult_choice(
             "Toggle %s to use. Press C to continue." % childType,
             database[childType] + database["Globals"][childType], "C")
-        add_children_to_parent(parent, chosen)
+        if chosen:
+            add_children_to_parent(parent, chosen)
 
     if type(parent) == structures.Channel:
         prompt = "Change %s spacing from (%s to %s)? Y/N" % (
@@ -151,10 +151,10 @@ def configure_child(database, parent, childType):
                         "Maximum %s spacing?" % childType[:-1]]
             child["spacing"] = ui.get_range(prompts)
 
-        prompt = "Turn %s global " + term + "? It's currently %s. Y/N"
-        prompt %= ("off", "on") if child["useGlobals"] else ("on", "off")
-        if ui.get_binary_choice(prompt):
-            child["useGlobals"] = not child["useGlobals"]
+    prompt = "Turn %s global " + childType + "? It's currently %s. Y/N"
+    prompt %= ("off", "on") if child["useGlobals"] else ("on", "off")
+    if ui.get_binary_choice(prompt):
+        child["useGlobals"] = not child["useGlobals"]
 
 
 def make_channel(database):
@@ -191,15 +191,12 @@ def make_instrument(database):
 
 def edit_instrument(database, instrument):
     """Let the user edit an existing Instrument"""
-
     prompt = "Change Instrument number from %s? Y/N" % instrument.number
     if not instrument.number or ui.get_binary_choice(prompt):
         prompt = "Enter a number for the Instrument."
         instrument.number = ui.get_number(prompt, 1, 255)
-
     for childType in ("Octaves", "Volumes", "Offsets"):
-        configure_child(database, instrument, childType, True)
-
+        configure_child(database, instrument, childType)
     return instrument
 
 

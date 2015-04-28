@@ -7,6 +7,7 @@ format, using an inter-connected database of musical structures
 
 import random
 import userinput as ui
+import structures
 
 
 def get_random_value(valueRange):
@@ -17,18 +18,18 @@ def get_random_value(valueRange):
     return random.randint(valueRange[0], valueRange[1])
 
 
-def tick_spacing(channel, pos):
+def tick_spacing(child):
     """
-    Decrement spacing at given position
-    (0 is Instrument, 1 is Volume, 2 is Effect)
-    Return True if the Channel should generate output for that position
+    Decrement/reset the current spacing of a child of a Channel
+    Return True if the Channel should generate output for that child,
+    and False otherwise
+    child must be one of Channel's Instrument, Volume, or Effect dicts
     """
-    if channel.currentSpacing[pos] <= 0:
-        channel.currentSpacing[pos] = random.randint(
-            channel.spacing[pos][0], channel.spacing[pos][1])
+    if child["curSpacing"] <= 0:
+        child["curSpacing"] = get_random_value(child["spacing"])
         return True
     else:
-        channel.currentSpacing[pos] -= 1
+        child["curSpacing"] -= 1
         return False
 
 
@@ -38,21 +39,81 @@ def get_random_child(children, globalChildren, useGlobals):
     optionally a list of global children
     If there are no children available, it returns None
     """
-
-    numChildren = len(children)
-    possible = numChildren
+    possible = list(children)
     if useGlobals:
-        possible += len(globalChildren)
-    if possible == 0:
+        for child in globalChildren:
+            if child not in possible:
+                possible.append(child)
+    if possible == []:
         return None
+    return possible[random.randint(0, len(possible) - 1)]
 
-    # pick a random instrument across local and global lists
-    roll = random.randint(0, possible - 1)
-    if roll < numChildren:
-        return children[roll]
+
+def get_instrument(globalDB, channel):
+    """Return a random Instrument for a Channel"""
+
+    note = ""
+    volume = ""
+    offsetValue = ""
+    nextSA = channel.currentSA
+    instrument = get_random_child(channel.instruments["local"],
+        globalDB["Instruments"], channel.instruments["useGlobals"])
+    instrument_map = list("0123456789:;<=>?@ABCDEFGHI")
+
+    if instrument is not None:
+        note = get_octave(globalDB, instrument)
+        # since Octaves might not be defined, don't always
+        # add Instrument data to note, so it'll be left blank
+        if note:
+            number = instrument.number
+            note += "%s%s" % (instrument_map[number / 10], number % 10)
+        volume = get_volume(globalDB, instrument)
+        offset = get_offset(globalDB, instrument)
+
+    return (note, volume, offsetValue), nextSA
+
+
+def get_octave(globalDB, instrument):
+    """Return a random Octave for an Instrument"""
+    octave = get_random_child(instrument.octaves["local"],
+            globalDB["Octaves"], instrument.octaves["useGlobals"])
+    if octave is None:
+        return ""
     else:
-        roll -= numChildren
-        return globalChildren[roll]
+        key = random.randint(0, len(octave.keys) - 1)
+        return "%s%s" % (octave.keys[key], octave.pitch)
+
+
+def get_effect(globalDB, channel):
+    """Return a random Effect for a Channel"""
+    effect = get_random_child(channel.effects["local"],
+        globalDB["Effects"], channel.effects["useGlobals"])
+    if effect is None:
+        return ""
+    else:
+        value = "%X" % get_random_value(effect.valueRange)
+        return effect.effect + value.zfill(2)
+
+
+def get_volume(globalDB, source):
+    """Return a random Volume for a Channel or an Instrument"""
+    volume = get_random_child(source.volumes["local"],
+        globalDB["Volumes"], source.volumes["useGlobals"])
+    if volume is None:
+        return ""
+    else:
+        value = str(get_random_value(volume.valueRange))
+        return volume.effect + value.zfill(2)
+
+
+def get_offset(globalDB, instrument):
+    """Return a random Offset for an Instrument"""
+    offset = get_random_child(instrument.offsets["local"],
+        globalDB["Offsets"], instrument.offsets["useGlobals"])
+    if offset is None:
+        return ""
+    else:
+        return format_offset(offset)
 
 
 def format_offset(offset):
@@ -73,65 +134,6 @@ def format_offset(offset):
     return nextSA, value
 
 
-def get_instrument(globalDB, channel):
-    """Return a random Instrument for a Channel"""
-
-    instrument = get_random_child(channel.instruments,
-        globalDB["Instruments"], channel.useGlobals[0])
-    instrument_map = list("0123456789:;<=>?@ABCDEFGHI")
-
-    note = ""
-    volume = ""
-    offset = ""
-    nextSA = channel.currentSA
-
-    if instrument is not None:
-        note = get_octave(globalDB, instrument)
-        # since Octaves might not be defined, don't always
-        # add Instrument data to note, so it'll be left blank
-        if note:
-            number = instrument.number
-            note += "%s%s" % (instrument_map[number / 10], number % 10)
-        volume = get_volume(globalDB, instrument)
-        if instrument.offset is not None:
-            nextSA, offset = format_offset(instrument.offset)
-
-    return (note, volume, offset), nextSA
-
-
-def get_octave(globalDB, instrument):
-    """Return a random Octave for an Instrument"""
-    octave = get_random_child(instrument.octaves,
-            globalDB["Octaves"], instrument.useGlobals[0])
-    if octave is None:
-        return ""
-    else:
-        key = random.randint(0, len(octave.keys) - 1)
-        return "%s%s" % (octave.keys[key], octave.pitch)
-
-
-def get_volume(globalDB, source):
-    """Return a random Volume for a Channel or an Instrument"""
-    volume = get_random_child(source.volumes,
-        globalDB["Volumes"], source.useGlobals[1])
-    if volume is None:
-        return ""
-    else:
-        value = str(get_random_value(volume.valueRange))
-        return volume.effect + value.zfill(2)
-
-
-def get_effect(globalDB, channel):
-    """Return a random Effect for a Channel"""
-    effect = get_random_child(channel.effects,
-        globalDB["Effects"], channel.useGlobals[2])
-    if effect is None:
-        return ""
-    else:
-        value = "%X" % get_random_value(effect.valueRange)
-        return effect.effect + value.zfill(2)
-
-
 def get_channel_line(database, channel):
     """Generates a single line for a channel"""
 
@@ -142,23 +144,19 @@ def get_channel_line(database, channel):
 
     # interrupts creating a line in favour of setting the
     # Sample Area for the channel correctly
-    if (channel.currentSpacing[0] <= 1 and
+    if (channel.instruments["curSpacing"] == 1 and
                 channel.nextSA != channel.currentSA):
-        channel.currentSpacing[0] -= 1
         channel.currentSA = channel.nextSA
         effect = "SA%X" % channel.nextSA
 
-    # if the Sample Area doesn't need to be set for this line,
-    # an Instrument is available, and should play now
-    if (not effect and channel.nextInstrument != "" and
-            tick_spacing(channel, 0)):
+    if tick_spacing(channel.instruments) and channel.nextInstrument != "":
         note, volume, effect = channel.nextInstrument
         channel.nextInstrument, channel.nextSA = get_instrument(
             database["Globals"], channel)
 
-    if not volume and tick_spacing(channel, 1):
+    if not volume and tick_spacing(channel.volumes):
         volume = get_volume(database["Globals"], channel)
-    if not effect and tick_spacing(channel, 2):
+    if not effect and tick_spacing(channel.effects):
         effect = get_effect(database["Globals"], channel)
 
     line = "|"
@@ -177,30 +175,17 @@ def init_channels(database):
         if channel.muted:
             continue
         channels.append(channel)
-        channel.currentSA = 0
-        channel.currentSpacing = [0, 0, 0]
+        channel.reset()
         channel.nextInstrument, channel.nextSA = get_instrument(
             database["Globals"], channel)
-        for x in range(3):
-            tick_spacing(channel, x)
+        for child in (channel.instruments, channel.volumes, channel.effects):
+            tick_spacing(child)
 
     return channels
 
 
-
-def produce(database):
-    """
-    Produces a tracker song from a given database
-    """
-
-    filePrompt = "Enter the name of a file to write the tracker notes to."
-    linesPrompt = "Enter how many lines you want to generate."
-    filename = ui.get_filename(filePrompt, 'w')
-    if filename is None:
-        return None
-    lines = ui.get_number(linesPrompt, 1)
-    channels = init_channels(database)
-
+def output(filename, lines):
+    """Generate and output a tracker song""" 
     with open(filename, 'w') as outfile:
         # header required for OpenMPT to parse file
         outfile.write("ModPlug Tracker  IT\n")
@@ -209,3 +194,18 @@ def produce(database):
             for channel in channels:
                 line += get_channel_line(database, channel)
             outfile.write(line + "\n")
+
+
+def produce(database, config):
+    """Produce a tracker song from a given database"""
+    filePrompt = "Enter the name of a file to write the tracker notes to."
+    linesPrompt = "Enter how many lines you want to generate."
+    filename = ui.get_filename(filePrompt, 'w')
+    if filename is None:
+        return None
+    channels = init_channels(database)
+    lines = ui.get_number(linesPrompt, 1)
+    output(filename, lines)
+    while ui.get_binary_choice("Repeat? Y/N"):
+        lines = ui.get_number(linesPrompt, 1)
+        output(filename, lines)

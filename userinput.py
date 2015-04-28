@@ -31,6 +31,7 @@ def get_binary_choice(prompt, valid=["Y", "N"], wanted="Y", skip=True):
     skip lets user skip choice by entering nothing, if true
     """
     if skip:
+        valid = list(valid)
         valid.append("")
     return get_choice(prompt, valid).startswith(wanted)
 
@@ -86,12 +87,12 @@ def convert_to_int(value, getHex=False):
         try:
             return int(value, 16)
         except:
-            print("Could not parse %s as a hex value." % value)
+            print("Could not parse \"%s\" as a hex value." % value)
     else:
         if value.isdigit():
             return int(value)
         else:
-            print("Could not parse %s as an int value." % value)
+            print("Could not parse \"%s\" as an int value." % value)
         
 
 def get_number(prompt, low=0, high=INFINITY, getHex=False):
@@ -162,33 +163,38 @@ def get_value_range(current, high, getHex):
         return current
 
 
-def get_filename(prompt, mode):
+def get_filename(prompt, mode, filename="", overwrite=False):
     """
     Prompt the user to choose a file to read or write to,
     returning the name of it
-    If the user declines to open any file, return None
+    If the user declines to open any file, return a blank string
+    filename if specified will verify it for operations
+    overwrite if True will not ask before overwriting a file
     """
 
     existsPrompt = "File %s already exists. Overwrite? Y/N"
-    errorMsg = "File %s does not exist."
     againPrompt = "Pick a different file? Y/N"
-    filename = None
+    choseFile = False
 
-    while filename is None:
-        filename = raw_input("\n" + prompt + "\n").strip()
+    while not choseFile:
+        if not filename:
+            filename = raw_input("\n" + prompt + "\n").strip()
         found = filename in os.listdir(".")
 
         if mode == 'r' and not found:
-            print(errorMsg % filename)
+            print("File %s cannot be read as it doesn't exist." % filename)
             if not get_binary_choice(againPrompt):
                 return None
+
         elif mode == 'w' and found:
-            if get_binary_choice(existsPrompt % filename):
+            if overwrite or get_binary_choice(existsPrompt % filename):
                 print("Overwriting %s." % filename)
+                choseFile = True
             else:
-                print("OK, I won't overwrite it.")
-                filename = None
+                filename = ""
                 if not get_binary_choice(againPrompt):
                     return None
+        else:
+            choseFile = True
 
     return filename

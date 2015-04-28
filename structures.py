@@ -19,30 +19,37 @@ class Channel(object):
             "spacing": (0, 0), "curSpacing": 0}
         self.effects = {"local": list(effects), "useGlobals": False,
             "spacing": (0, 0), "curSpacing": 0}
+        self.overwrite = overwrite
+        self.muted = muted
+        self.reset()
+
+    def reset(self):
+        """Reset a Channel for production"""
+        for local in (self.instruments, self.volumes, self.effects):
+            local["curSpacing"] = 0
         # stores a tuple of instrument data during production 
         self.nextInstrument = None
         # keeps track of changing the SA for Instrument Offsets
         self.currentSA = 0
         self.nextSA = 0
-        self.overwrite = overwrite
-        self.muted = muted
 
     def __str__(self):
 
-        s = self.spacing
-        numInst = len(self.instruments)
-        info = "Uses %s Instrument%s" % (numInst, plural(numInst))
-        if self.useGlobalss[0]:
-            info += " (G)"
-        info += ", spaced %s-%s" % (s[0][0], s[0][1])
-        numEffects = len(self.effects)
-        info += ". Uses %s Effect%s" % (numEffects, plural(numEffects))
-        if self.useGlobalss[1]:
-            info += " (G)"
+        n = len(self.instruments["local"])
+        info = "Uses %s Instrument%s%s " % (n, plural(n),
+            " (G)" * self.instruments["useGlobals"])
+        info += "(%s-%s), " % self.instruments["spacing"]
+        n = len(self.volumes["local"])
+        info += "%s Volume%s%s " % (n, plural(n),
+            " (G)" * self.volumes["useGlobals"])
+        info += "(%s-%s), " % self.volumes["spacing"]
+        n = len(self.effects["local"])
+        info += "and %s Effect%s%s " % (n, plural(n),
+            " (G)" * self.effects["useGlobals"])
+        info += "(%s-%s). " % self.effects["spacing"]
 
-        info += ", spaced %s-%s. Overwrite is " % (s[1][0], s[1][1])
-        info += "on." if self.overwrite else "off."
-        info += " Not in use." if self.muted else " In use."
+        info += "Overwrite is %s. " % ("on" if self.overwrite else "off")
+        info += "Muted." if self.muted else "In use."
 
         return info
 
@@ -54,31 +61,27 @@ class Instrument(object):
         self.octaves = {"local": list(octaves), "useGlobals": False}
         self.volumes = {"local": list(volumes), "useGlobals": False}
         self.offsets = {"local": list(offsets), "useGlobals": False}
-        self.useGlobals = list(useGlobals)
         self.usedBy = []
 
     def __str__(self):
 
-        info = "Instrument #%s." % self.number
+        info = "Instrument #%s. " % self.number
 
-        numOctaves = len(self.octaves)
-        info += " %s Octave%s" % (numOctaves, plural(numOctaves))
-        if self.useGlobals[0]:
-            info += " (G)"
-        numVolumes = len(self.volumes)
-        info += ". %s Volume%s" % (numVolumes, plural(numVolumes))
-        if self.useGlobals[1]:
-            info += " (G)"
+        n = len(self.octaves["local"])
+        info += "Uses %s Octave%s%s, " % (n, plural(n),
+            " (G)" * self.octaves["useGlobals"])
+        n = len(self.volumes["local"])
+        info += "%s Volume%s%s, " % (n, plural(n),
+            " (G)" * self.volumes["useGlobals"])
+        n = len(self.offsets["local"])
+        info += "and %s Offset%s%s. " % (n, plural(n),
+            " (G)" * self.offsets["useGlobals"])
 
-        if self.offset is None:
-            info += ". No Offset."
-        else:
-            info += ". Uses an Offset."
         if self.usedBy:
             n = len(self.usedBy)
-            info += " Used by %s Channels%s." % (n, plural(n))
+            info += "Used by %s Channels%s." % (n, plural(n))
         else:
-            info += " Not in use."
+            info += "Not in use."
 
         return info
 
@@ -109,7 +112,7 @@ class Octave(object):
 
 class Effect(object):
 
-    def __init__(self, effect="", valueRange=(0, 64)):
+    def __init__(self, effect="", valueRange=(0, 255)):
         self.effect = effect
         self.valueRange = valueRange
         self.usedBy = []

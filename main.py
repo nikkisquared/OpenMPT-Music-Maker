@@ -4,10 +4,10 @@ from __future__ import print_function
 
 """A Note and Effect randomizer for OpenMPT"""
 
-import random
-import pickle
 import os
 import copy
+import pickle
+import ConfigParser
 
 import interface
 import userinput as ui
@@ -145,21 +145,30 @@ def database_actions(action, database, useGlobals):
 
     functions = {"A": add_to_db, "D": delete_from_db,
                 "V": view_db, "E": edit_db}
+    actions = {"A": "adding to %s database",
+                "D": "deleting from %s database",
+                "V": "viewing parts of %s database",
+                "E": "editing structures in %s database"}
     titles = {"C": "Channels", "I": "Instruments", "O": "Octaves",
                 "V": "Volumes", "E": "Effects", "F": "Offsets"}
+    if useGlobals:
+        actions[action] %= "Globals"
+    else:
+        actions[action] %= "root"
 
     choice = choose_structure()
     while choice != "B":
         functions[action](database, choice, titles[choice], useGlobals)
-        print("Repeating action.")
+        print("\nRepeating %s." % actions[action])
         choice = choose_structure()
 
 
-def save_database(database):
+def save_database(database, given="", overwrite=False):
     """Save the database to a file"""
     prompt = "Enter the name of the file to save to."
     filename = ui.get_filename(prompt, 'w')
     if filename:
+        # pickle seems to not work well unless I do this?
         if filename in os.listdir("."):
             os.remove(filename)
         with open(filename, 'w') as outfile:
@@ -168,11 +177,11 @@ def save_database(database):
         print("No file to save to.")
 
 
-def load_database(database):
+def load_database(database, given=""):
     """Load a file into or over the database"""
 
     prompt = "Enter the name of a file to load from."
-    filename = ui.get_filename(prompt, 'r')
+    filename = ui.get_filename(prompt, 'r', given)
     if not filename:
         print("No file to load from.")
         return None
@@ -180,7 +189,10 @@ def load_database(database):
         newDatabase = pickle.load(infile)
 
     prompt = "(O)verwrite Database, or (A)ppend to it?"
-    if ui.get_binary_choice(prompt, list("OA"), "O", False):
+    if given:
+        print("Sucessfully loaded database from %s." % filename)
+        database.update(newDatabase)
+    elif ui.get_binary_choice(prompt, list("OA"), "O", False):
         print("Overwriting database.")
         database.update(newDatabase)
     else:
@@ -208,10 +220,10 @@ def context_header(menu, useGlobals):
     header = ""
     if menu == "database":
         if useGlobals:
-            header = "Acting on Globals Database"
+            header = "Acting on Globals Database\n"
         else:
-            header = "Acting on root Database"
-    return header + "\n"
+            header = "Acting on root Database\n"
+    return header
 
 
 def init_menus():
@@ -223,8 +235,8 @@ def init_menus():
     prompt["root"] = (
         "Choose an option:\n"
         "(R)un Program\t(T)oggle Channels\n"
-        "(D)atabase Operations Menu\n"
         "(P)arse Args\t(B)atch Operations\n"
+        "(D)atabase Operations Menu\n"
         "(S)ave Database\t(L)oad Database\n"
         "(I)ni File Settings\n"
         "(Q)uit")
@@ -244,16 +256,28 @@ def init_menus():
     return prompt, valid
 
 
+def get_config_section(config, section):
+    """Return a dict of a config section"""
+    return dict(config.items(section))
+
+
 def main():
     """Run the main menu of the program"""
 
     prompt, valid = init_menus()
     menu = "root"
-    numberBase = "default"
+    
     database = {"Channels": [], "Instruments": [], "Octaves": [],
                 "Effects": [], "Volumes": [], "Offsets": []}
     database["Globals"] = copy.deepcopy(database)
     useGlobals = False
+    numberBase = "default"
+
+    config = ConfigParser.ConfigParser()
+    config.read("config.ini")
+    dbConfig = dict(config.items("Database"))
+    if dbConfig["load"]:
+        load_database(database, dbConfig["load"])
 
     choice = ""
     while choice != "Q":
@@ -272,13 +296,12 @@ def main():
         elif choice == "Q":
             continue
         elif choice == "R":
-            tracker.produce(database)
-        elif choice == "T":
-            pass
+            production = dict(config.items("Production"))
+            tracker.produce(database, production)
         elif choice == "D":
             menu = "database"
         elif choice == "S":
-            save_database(database)
+            save_database(database, dbConfig)
         elif choice == "L":
             load_database(database)
         else:

@@ -1,4 +1,4 @@
-#!usr/bin/python
+#!/usr/bin/env python
 
 """
 Generates a completely randomized arrangement of notes for OpenMPT tracker

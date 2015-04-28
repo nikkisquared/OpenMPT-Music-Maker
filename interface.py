@@ -21,18 +21,93 @@ def paginate(array, pageLength=10):
     return pages
 
 
-def add_x_to_y_at_z(x, y, z):
+def remove_all_links(structure):
+    """Remove all links to and from a given structure"""
+
+    structType = type(structure)
+
+    if structType == structures.Channel:
+        for instrument in structure.instruments["local"]:
+            instrument.usedBy.remove(structure)
+        for volume in structure.volumes["local"]:
+            volume.usedBy["Channels"].remove(structure)
+        for effect in structure.effects["local"]:
+            effect.usedBy.remove(structure)
+        structure.instruments["local"] = []
+        structure.volumes["local"] = []
+        structure.effects["local"] = []
+
+    elif structType == structures.Instrument:
+        for channel in structure.usedBy:
+            channel.instruments["local"].remove(structure)
+        for octave in structure.octaves["local"]:
+            octave.usedBy.remove(structure)
+        for volume in structure.volumes["local"]:
+            volume.usedBy["Instruments"].remove(structure)
+        for offset in structure.offsets["local"]:
+            offset.usedBy.remove(structure)
+        structure.octaves["local"] = []
+        structure.volumes["local"] = []
+        structure.offsets["local"] = []
+
+    elif structType == structures.Octave:
+        for instrument in structure.usedBy:
+            instrument.octaves["local"].remove(structure)
+        structure.usedBy = []
+    elif structType == structures.Effect:
+        for channel in structure.usedBy:
+            channel.effects["local"].remove(structure)
+        structure.usedBy = []
+    elif structType == structures.Offset:
+        for instrument in structure.usedBy:
+            instrument.offsets["local"].remove(structure)
+        structure.usedBy = []
+
+    elif structType == structures.Volume:
+        for channel in structure.usedBy["Channels"]:
+            channel.volumes["local"].remove(structure)
+        for instrument in structure.usedBy["Instruments"]:
+            instrument.volumes["local"].remove(structure)
+        structure.usedBy["Channels"] = []
+        structure.usedBy["Instruments"] = []
+
+
+def add_children_to_parent(parent, children):
     """
-    Adds as many elements of x possible to y's z;
-    inserts references back to y in each x
-    x is a list of structures
-    y is a Channel or Instrument
-    z is the list to add structures to
+    Adds as many children to parent as possible and store
+    references back to the parent in each new child
+    parent must be a Channel or an Instrument
+    children must be am exclusive list of Instruments,
+    Octaves, Effects, Volumes, or Offsets
     """
-    for thing in x:
-        if thing and thing not in z:
-            z.append(thing)
-            thing.usedBy.append(y)
+
+    parentType = type(parent)
+    childType = type(child)
+
+    for child in children:
+
+        if not child or child in parent:
+            continue
+
+        if childType == structures.Instrument:
+            pointer = parent.instruments
+        if childType == structures.Octaves:
+            pointer = parent.volumes
+        elif childType == structures.Effects:
+            pointer = parent.effects
+        elif childType == structures.Volumes:
+            pointer = parent.volumes
+        elif childType == structures.Offsets:
+            pointer = parent.offsets
+
+        pointer["local"].append(child)
+        if childType != structures.Volumes:
+            child.usedBy.append(parent)
+        else:
+            if parentType == structures.Instruments:
+                child.usedBy["Instruments"].append(parent)
+            else:
+                child.usedBy["Channel"].append(parent)
 
 
 def make_channel(database):
@@ -43,14 +118,13 @@ def make_channel(database):
 def edit_channel(database, channel):
     """Let the user edit an existing Channel"""
 
-    addTo = (channel.instruments, channel.volumes, channel.effects)
     for pos, term in enumerate(["Instruments", "Volumes", "Effects"]):
 
         if ui.get_binary_choice("Add %s? Y/N" % term):
             chosen = ui.make_mult_choice(
                 "Press C to continue. Toggle %s to use:" % term,
                 database[term] + database["Globals"][term], "C")
-            add_x_to_y_at_z(chosen, channel, addTo[pos])
+            add_children_to_parent(channel, chosen)
 
         prompt = "Change %s spacing from %s to %s? Y/N" % (
                 term, channel.spacing[pos][0], channel.spacing[pos][1])
@@ -92,14 +166,12 @@ def edit_instrument(database, instrument):
         prompt = "Enter a number for the Instrument."
         instrument.number = ui.get_number(prompt, 1, 255)
 
-    addTo = (instrument.octaves, instrument.volumes)
-
-    for pos, term in enumerate(["Octaves", "Volumes"]):
+    for pos, term in enumerate(["Octaves", "Volumes", "Offsets"]):
         if ui.get_binary_choice("Add %s? Y/N"% term):
             chosen = ui.make_mult_choice(
                 "Press C to continue. Toggle %s to use:" % term,
                 database[term] + database["Globals"][term], "C")
-            add_x_to_y_at_z(chosen, instrument, addTo[pos])
+            add_children_to_parent(instrument, chosen)
 
         prompt = "Turn %s global " + term + "? It's currently %s. Y/N"
         if instrument.useGlobals[pos]:
@@ -108,11 +180,6 @@ def edit_instrument(database, instrument):
             prompt %= ("on", "off")
         if ui.get_binary_choice(prompt):
             instrument.useGlobals[pos] = not instrument.useGlobals[pos]
-
-    if ui.get_binary_choice("Add an Offset? Y/N"):
-        instrument.offset = ui.make_mult_choice(
-            "Choose an octave below.", database["Offsets"], single=True)
-        instrument.offset.usedBy.append(instrument)
 
     return instrument
 

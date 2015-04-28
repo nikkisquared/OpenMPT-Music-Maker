@@ -13,24 +13,19 @@ def plural(value):
 class Channel(object):
 
     def __init__(self, instruments=[], volumes=[], effects=[],
-                spacing=[[0, 0], [0, 0], [0, 0]],
-                useGlobals=[True, True, True],
                 overwrite=False, muted=False):
 
-        self.instruments = list(instruments)
+        self.instruments = {"local": list(instruments), "useGlobal": False,
+            "spacing": (0, 0), "curSpacing": 0}
+        self.volumes = {"local": list(volumes), "useGlobal": False,
+            "spacing": (0, 0), "curSpacing": 0}
+        self.effects = {"local": list(effects), "useGlobal": False,
+            "spacing": (0, 0), "curSpacing": 0}
         # stores a tuple of instrument data during production 
         self.nextInstrument = None
         # keeps track of changing the SA for Instrument Offsets
         self.currentSA = 0
         self.nextSA = 0
-
-        self.volumes = list(volumes)
-        self.effects = list(effects)
-        self.spacing = deepcopy(spacing)
-        # spacing to tick through during production
-        self.currentSpacing = [0, 0, 0]
-
-        self.useGlobals = list(useGlobals)
         self.overwrite = overwrite
         self.muted = muted
 
@@ -56,12 +51,11 @@ class Channel(object):
 
 class Instrument(object):
 
-    def __init__(self, number=0, octaves=[], volumes=[], offset=None,
-                useGlobals=[True, True]):
+    def __init__(self, number=0, octaves=[], volumes=[], offsets=[]):
         self.number = number
-        self.octaves = list(octaves)
-        self.volumes = list(volumes)
-        self.offset = offset
+        self.octaves = {"local": list(octaves), "useGlobal": False}
+        self.volumes = {"local": list(volumes), "useGlobal": False}
+        self.offsets = {"local": list(offsets), "useGlobal": False}
         self.useGlobals = list(useGlobals)
         self.usedBy = []
 
@@ -72,11 +66,11 @@ class Instrument(object):
         numOctaves = len(self.octaves)
         info += " %s Octave%s" % (numOctaves, plural(numOctaves))
         if self.useGlobals[0]:
-            info += " + globals"
+            info += " (G)"
         numVolumes = len(self.volumes)
         info += ". %s Volume%s" % (numVolumes, plural(numVolumes))
         if self.useGlobals[1]:
-            info += " + globals"
+            info += " (G)"
 
         if self.offset is None:
             info += ". No Offset."
@@ -144,6 +138,7 @@ class Volume(Effect):
 
     def __init__(self, effect="", valueRange=[0, 64]):
         super(Volume, self).__init__(effect.lower(), valueRange)
+        self.usedBy = {"Channels": [], "Instruments": []}
 
     def __str__(self):
         vr = self.valueRange

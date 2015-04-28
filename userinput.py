@@ -141,7 +141,7 @@ def get_range(prompts, low=0, high=INFINITY, current=[], getHex=False):
         second = first
     else:
         second = get_number(prompts[1], first, high, getHex)
-    return [first, second]
+    return (first, second)
 
 
 def get_value_range(current, high, getHex):

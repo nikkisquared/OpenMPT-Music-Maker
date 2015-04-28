@@ -35,30 +35,46 @@ def choose_structure():
     return ui.get_choice(prompt, valid)
 
 
-def add_to_db(database, thing, title, useGlobals):
+def add_to_db(database, choice, title, useGlobals):
     """Let the user add a structure to a database"""
 
     funcs = {"O": interface.make_octave, "V": interface.make_volume,
             "E": interface.make_effect, "F": interface.make_offset}
 
     print("\nMaking a %s." % title[:-1])
-    if thing == "C":
+    if choice == "C":
         new = interface.make_channel(database)
-    elif thing == "I":
+    elif choice == "I":
         new = interface.make_instrument(database)
     else:
-        new = funcs[thing]()
+        new = funcs[choice]()
     if useGlobals:
         database["Globals"][title].append(new)
     else:
         database[title].append(new)
 
 
-def delete_from_db(database, thing, title, useGlobals):
-    pass
+def delete_from_db(database, choice, title, useGlobals):
+    """Let the user delete structures from the Database."""
+
+    if useGlobals:
+        db = database["Globals"]
+        globalNote = "Global "
+    else:
+        db = database
+        globalNote = ""
+
+    prompt = "Choose %s%s to delete. Press C to continue." % (
+        globalNote, title)
+    deleteThese = ui.make_mult_choice(prompt, db[title], "C")
+
+    for structure in deleteThese:
+        interface.remove_all_links(structure)
+        db[title].remove(structure)
+    print("\nDeleted %s %s%s." % (len(deleteThese), globalNote, title))
 
 
-def view_db(database, thing, title, useGlobals):
+def view_db(database, choice, title, useGlobals):
     """Let the user page through part of the database"""
 
     if useGlobals:
@@ -67,6 +83,7 @@ def view_db(database, thing, title, useGlobals):
     else:
         db = database
         globalNote = ""
+
     pages = interface.paginate(db[title])
     if pages[0] == []:
         prompt = "There are no %s%s to view. Press any key to continue."
@@ -94,8 +111,8 @@ def view_db(database, thing, title, useGlobals):
         choice = ui.get_choice(prompt, valid)
 
 
-def edit_db(database, thing, title, useGlobals):
-    """Let the user edit a thing in the database"""
+def edit_db(database, choice, title, useGlobals):
+    """Let the user edit a structure in the database"""
 
     funcs = {"O": interface.edit_octave, "V": interface.edit_volume,
             "E": interface.edit_effect, "F": interface.edit_offset}
@@ -104,12 +121,12 @@ def edit_db(database, thing, title, useGlobals):
     prompt = "Choose a %s to edit." % title[:-1]
     db = database["Globals"] if useGlobals else database
     structure = ui.make_mult_choice(prompt, db[title], single=True)
-    if thing == "C":
+    if choice == "C":
         interface.edit_channel(database, structure)
-    elif thing == "I":
+    elif choice == "I":
         interface.edit_instrument(database, structure)
     else:
-        funcs[thing](structure)
+        funcs[choice](structure)
 
 
 def arrange_db(database):
@@ -123,7 +140,7 @@ def arrange_db(database):
         where = get_choice(prompt, valid)
 
 
-def database_actions(choice, database, useGlobals):
+def database_actions(action, database, useGlobals):
     """Middle function for performing actions on the database"""
 
     functions = {"A": add_to_db, "D": delete_from_db,
@@ -131,11 +148,11 @@ def database_actions(choice, database, useGlobals):
     titles = {"C": "Channels", "I": "Instruments", "O": "Octaves",
                 "V": "Volumes", "E": "Effects", "F": "Offsets"}
 
-    structure = choose_structure()
-    while structure != "B":
-        functions[choice](database, structure, titles[structure], useGlobals)
+    choice = choose_structure()
+    while choice != "B":
+        functions[action](database, choice, titles[choice], useGlobals)
         print("Repeating action.")
-        structure = choose_structure()
+        choice = choose_structure()
 
 
 def save_database(database):
@@ -143,7 +160,8 @@ def save_database(database):
     prompt = "Enter the name of the file to save to."
     filename = ui.get_filename(prompt, 'w')
     if filename:
-        os.remove(filename)
+        if filename in os.listdir("."):
+            os.remove(filename)
         with open(filename, 'w') as outfile:
             pickle.dump(database, outfile)
     else:

@@ -184,7 +184,7 @@ def init_channels(database):
     return channels
 
 
-def output(filename, lines):
+def output(database, filename, channels, lines):
     """Generate and output a tracker song""" 
     with open(filename, 'w') as outfile:
         # header required for OpenMPT to parse file
@@ -196,16 +196,32 @@ def output(filename, lines):
             outfile.write(line + "\n")
 
 
+def get_lines_wanted(configLines):
+    """
+    Prompt the user to enter a number of lines to write with
+    as long as it's not defined in the config file already
+    """
+    if configLines.isdigit():
+        lines = int(configLines)
+        print("Automatically writing %s lines from the config file." % lines)
+    else:
+        linesPrompt = "Enter how many lines you want to generate."
+        lines = ui.get_number(linesPrompt, 1)
+    return lines
+
+
 def produce(database, config):
     """Produce a tracker song from a given database"""
+
     filePrompt = "Enter the name of a file to write the tracker notes to."
-    linesPrompt = "Enter how many lines you want to generate."
-    filename = ui.get_filename(filePrompt, 'w')
+    filename = ui.get_filename(filePrompt, 'w',
+        config["filename"], config["overwrite"])
     if filename is None:
         return None
-    channels = init_channels(database)
-    lines = ui.get_number(linesPrompt, 1)
-    output(filename, lines)
-    while ui.get_binary_choice("Repeat? Y/N"):
-        lines = ui.get_number(linesPrompt, 1)
-        output(filename, lines)
+
+    repeat = True
+    while repeat:
+        channels = init_channels(database)
+        lines = get_lines_wanted(config["lines"])
+        output(database, filename, channels, lines)
+        repeat = ui.get_binary_choice("Repeat? Y/N")

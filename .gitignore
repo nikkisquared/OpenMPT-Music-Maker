@@ -3,3 +3,4 @@
 *.sublime*
 musicold.py
 *.db
+config.ini

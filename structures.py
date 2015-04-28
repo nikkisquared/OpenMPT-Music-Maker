@@ -2,8 +2,6 @@
 
 """Class objects defining aspects of a tracker production"""
 
-from copy import deepcopy
-
 
 def plural(value):
     """Get an "s" or "" depending on value"""
@@ -15,11 +13,11 @@ class Channel(object):
     def __init__(self, instruments=[], volumes=[], effects=[],
                 overwrite=False, muted=False):
 
-        self.instruments = {"local": list(instruments), "useGlobal": False,
+        self.instruments = {"local": list(instruments), "useGlobals": False,
             "spacing": (0, 0), "curSpacing": 0}
-        self.volumes = {"local": list(volumes), "useGlobal": False,
+        self.volumes = {"local": list(volumes), "useGlobals": False,
             "spacing": (0, 0), "curSpacing": 0}
-        self.effects = {"local": list(effects), "useGlobal": False,
+        self.effects = {"local": list(effects), "useGlobals": False,
             "spacing": (0, 0), "curSpacing": 0}
         # stores a tuple of instrument data during production 
         self.nextInstrument = None
@@ -34,12 +32,12 @@ class Channel(object):
         s = self.spacing
         numInst = len(self.instruments)
         info = "Uses %s Instrument%s" % (numInst, plural(numInst))
-        if self.useGlobals[0]:
+        if self.useGlobalss[0]:
             info += " (G)"
         info += ", spaced %s-%s" % (s[0][0], s[0][1])
         numEffects = len(self.effects)
         info += ". Uses %s Effect%s" % (numEffects, plural(numEffects))
-        if self.useGlobals[1]:
+        if self.useGlobalss[1]:
             info += " (G)"
 
         info += ", spaced %s-%s. Overwrite is " % (s[1][0], s[1][1])
@@ -53,9 +51,9 @@ class Instrument(object):
 
     def __init__(self, number=0, octaves=[], volumes=[], offsets=[]):
         self.number = number
-        self.octaves = {"local": list(octaves), "useGlobal": False}
-        self.volumes = {"local": list(volumes), "useGlobal": False}
-        self.offsets = {"local": list(offsets), "useGlobal": False}
+        self.octaves = {"local": list(octaves), "useGlobals": False}
+        self.volumes = {"local": list(volumes), "useGlobals": False}
+        self.offsets = {"local": list(offsets), "useGlobals": False}
         self.useGlobals = list(useGlobals)
         self.usedBy = []
 
@@ -111,9 +109,9 @@ class Octave(object):
 
 class Effect(object):
 
-    def __init__(self, effect="", valueRange=[0, 255]):
+    def __init__(self, effect="", valueRange=(0, 64)):
         self.effect = effect
-        self.valueRange = list(valueRange)
+        self.valueRange = valueRange
         self.usedBy = []
 
     def __str__(self):
@@ -136,7 +134,7 @@ class Effect(object):
 
 class Volume(Effect):
 
-    def __init__(self, effect="", valueRange=[0, 64]):
+    def __init__(self, effect="", valueRange=(0, 64)):
         super(Volume, self).__init__(effect.lower(), valueRange)
         self.usedBy = {"Channels": [], "Instruments": []}
 
@@ -147,19 +145,21 @@ class Volume(Effect):
             info += "The value is always %s." % vr[0]
         else:
             info += "The value range is %s to %s." % (vr[0], vr[1])
-        if self.usedBy:
-            n = len(self.usedBy)
-            info += " Used by %s Instrument%s." % (n, plural(n))
-        else:
+        if not self.usedBy["Channels"] or self.usedBy["Instruments"]:
             info += " Not in use."
+        else:
+            n = len(self.usedBy["Channels"])
+            info += " Used by %s Channel%s, " % (n, plural(n))
+            n = len(self.usedBy["Instruments"])
+            info += " Used by %s Instrument%s." % (n, plural(n))
         return info
 
 
 class Offset(Effect):
 
-    def __init__(self, valueRange=[0, 255], sampleArea=[0, 0]):
+    def __init__(self, valueRange=(0, 255), sampleArea=(0, 0)):
         super(Offset, self).__init__("O", valueRange)
-        self.sampleArea = list(sampleArea)
+        self.sampleArea = sampleArea
 
     def __str__(self):
         info = self.range_info()

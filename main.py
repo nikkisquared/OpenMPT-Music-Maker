@@ -191,21 +191,65 @@ def load_database(database):
             database["Globals"][key] += newDatabase["Globals"][key]
 
 
+def switch_globals(useGlobals):
+    """Switches the useGlobals flag and prints an appropiate message"""
+    if useGlobals:
+        print("No longer working on Globals.")
+        header = "Working on root database"
+    else:
+        print("Now working on Globals.")
+        header = "Working on Globals database"
+    return not useGlobals
+
+
+def context_header(menu, useGlobals):
+    """Used for varying menu headers depending on context"""
+
+    header = ""
+    if menu == "database":
+        if useGlobals:
+            header = "Acting on Globals Database"
+        else:
+            header = "Acting on root Database"
+    return header + "\n"
+
+
+def init_menus():
+    """Initializes and returns menu dialogs"""
+
+    prompt = {}
+    valid = {}
+
+    prompt["root"] = (
+        "Choose an option:\n"
+        "(R)un Program\t(T)oggle Channels\n"
+        "(D)atabase Operations Menu\n"
+        "(P)arse Args\t(B)atch Operations\n"
+        "(S)ave Database\t(L)oad Database\n"
+        "(I)ni File Settings\n"
+        "(Q)uit")
+    valid["root"] = list("BDILPQRST")
+
+    prompt["database"] = (
+        "Choose an option:\n"
+        "(A)dd Things\t(D)elete Things\n"
+        "(V)iew Things\t(E)dit Things\n"
+        "(M)ove Things\t(G)lobals Switch\n"
+        "(L)ink Explorer\n"
+        # ie default/decimal/hex
+        "(N)umber Base Switch\n"
+        "(B)ack to Main Menu")
+    valid["database"] = list("ABDEGLMNV")
+
+    return prompt, valid
+
+
 def main():
     """Run the main menu of the program"""
 
-    prompt = ("Choose an option:\n"
-            "(R)un Program\t(T)oggle Channels\n"
-            "(A)dd Things\t(D)elete Things\n"
-            "(V)iew Things\t(E)dit Things\n"
-            "(M)ove Things\t(G)lobals Switch\n"
-            # ie decimal/hex/default
-            "(B)ase Switch\n"
-            "(P)arse Args\t(?)Batch Operations\n"
-            "(S)ave File\t(L)oad File\n"
-            "(Q)uit")
-    valid = list("RTADVEGMBPSLQ")
-
+    prompt, valid = init_menus()
+    menu = "root"
+    numberBase = "default"
     database = {"Channels": [], "Instruments": [], "Octaves": [],
                 "Effects": [], "Volumes": [], "Offsets": []}
     database["Globals"] = copy.deepcopy(database)
@@ -213,22 +257,26 @@ def main():
 
     choice = ""
     while choice != "Q":
-        choice = ui.get_choice(prompt, valid)
+        header = context_header(menu, useGlobals)
+        choice = ui.get_choice(header + prompt[menu], valid[menu])
 
-        if choice == "Q":
+        if menu == "database":
+            if choice == "B":
+                menu = "root"
+            elif choice in "ADVE":
+                database_actions(choice, database, useGlobals)
+            elif choice == "G":
+                useGlobals = switch_globals(useGlobals)
+            elif choice == "M":
+                arrange_db(database)
+        elif choice == "Q":
             continue
         elif choice == "R":
             tracker.produce(database)
-        elif choice in "ADVE":
-            database_actions(choice, database, useGlobals)
-        elif choice == "M":
-            arrange_db(database)
-        elif choice == "G":
-            useGlobals = not useGlobals
-            if useGlobals:
-                print("Now working on Globals.")
-            else:
-                print("No longer working on Globals.")
+        elif choice == "T":
+            pass
+        elif choice == "D":
+            menu = "database"
         elif choice == "S":
             save_database(database)
         elif choice == "L":

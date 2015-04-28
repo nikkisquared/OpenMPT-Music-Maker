@@ -50,6 +50,14 @@ def remove_all_links(structure):
         structure.volumes["local"] = []
         structure.offsets["local"] = []
 
+    elif structType == structures.Volume:
+        for channel in structure.usedBy["Channels"]:
+            channel.volumes["local"].remove(structure)
+        for instrument in structure.usedBy["Instruments"]:
+            instrument.volumes["local"].remove(structure)
+        structure.usedBy["Channels"] = []
+        structure.usedBy["Instruments"] = []
+
     elif structType == structures.Octave:
         for instrument in structure.usedBy:
             instrument.octaves["local"].remove(structure)
@@ -62,14 +70,6 @@ def remove_all_links(structure):
         for instrument in structure.usedBy:
             instrument.offsets["local"].remove(structure)
         structure.usedBy = []
-
-    elif structType == structures.Volume:
-        for channel in structure.usedBy["Channels"]:
-            channel.volumes["local"].remove(structure)
-        for instrument in structure.usedBy["Instruments"]:
-            instrument.volumes["local"].remove(structure)
-        structure.usedBy["Channels"] = []
-        structure.usedBy["Instruments"] = []
 
 
 def add_children_to_parent(parent, children):
@@ -110,6 +110,53 @@ def add_children_to_parent(parent, children):
                 child.usedBy["Channel"].append(parent)
 
 
+def configure_child(database, parent, childType):
+    """
+    Configure all options for a specific child of a parent
+    parent can be a Channel or an Instrument
+    childType can be a string of "Instruments", "Octaves", "Effects",
+    "Volumes", or "Offsets", and assumes the parent has that child
+    """
+
+    if type(parent) == structures.Channel:
+        parentType = "Channel"
+    elif type(parent) == structures.Instrument:
+        parentType = "Instrument"
+
+    if childType == "Instruments":
+        child = parent.instruments
+    elif childType == "Octaves":
+        child = parent.octaves
+    elif childType == "Effects":
+        child = parent.effects
+    elif childType == "Volumes":
+        child = parent.volumes
+    elif childType == "Offsets":
+        child = parent.offsets
+
+    if not ui.get_binary_choice("Edit %s %s? Y/N" % (parentType, childType)):
+        return None
+
+    if ui.get_binary_choice("Add %s? Y/N" % childType):
+        chosen = ui.make_mult_choice(
+            "Toggle %s to use. Press C to continue." % childType,
+            database[childType] + database["Globals"][childType], "C")
+        add_children_to_parent(parent, chosen)
+
+    if type(parent) == structures.Channel:
+        prompt = "Change %s spacing from (%s to %s)? Y/N" % (
+            childType, child["spacing"][0], child["spacing"][1])
+        if ui.get_binary_choice(prompt):
+            prompts = ["Minimum %s spacing?" % childType[:-1],
+                        "Maximum %s spacing?" % childType[:-1]]
+            child["spacing"] = ui.get_range(prompts)
+
+        prompt = "Turn %s global " + term + "? It's currently %s. Y/N"
+        prompt %= ("off", "on") if child["useGlobals"] else ("on", "off")
+        if ui.get_binary_choice(prompt):
+            child["useGlobals"] = not child["useGlobals"]
+
+
 def make_channel(database):
     """Wrapper for creating a new Channel"""
     return edit_channel(database, structures.Channel())
@@ -118,24 +165,8 @@ def make_channel(database):
 def edit_channel(database, channel):
     """Let the user edit an existing Channel"""
 
-    for pos, term in enumerate(["Instruments", "Volumes", "Effects"]):
-
-        if ui.get_binary_choice("Add %s? Y/N" % term):
-            chosen = ui.make_mult_choice(
-                "Press C to continue. Toggle %s to use:" % term,
-                database[term] + database["Globals"][term], "C")
-            add_children_to_parent(channel, chosen)
-
-        prompt = "Change %s spacing from %s to %s? Y/N" % (
-                term, channel.spacing[pos][0], channel.spacing[pos][1])
-        if ui.get_binary_choice(prompt):
-            msgs = ["Minimum %s spacing?" % term,
-                    "Maximum %s spacing?" % term]
-            channel.spacing[pos] = ui.get_range(msgs)
-        prompt = "Turn %s global " + term + "? It's currently %s. Y/N"
-        prompt %= ("off", "on") if channel.useGlobals[pos] else ("on", "off")
-        if ui.get_binary_choice(prompt):
-            channel.useGlobals[pos] = not channel.useGlobals[pos]
+    for childType in ("Instruments", "Volumes", "Effects"):
+        configure_child(database, channel, childType)
 
     prompt = "Turn %s overwriting? It's currently %s. Y/N"
     prompt %= ("off", "on") if channel.overwrite else ("on", "off")
@@ -166,20 +197,8 @@ def edit_instrument(database, instrument):
         prompt = "Enter a number for the Instrument."
         instrument.number = ui.get_number(prompt, 1, 255)
 
-    for pos, term in enumerate(["Octaves", "Volumes", "Offsets"]):
-        if ui.get_binary_choice("Add %s? Y/N"% term):
-            chosen = ui.make_mult_choice(
-                "Press C to continue. Toggle %s to use:" % term,
-                database[term] + database["Globals"][term], "C")
-            add_children_to_parent(instrument, chosen)
-
-        prompt = "Turn %s global " + term + "? It's currently %s. Y/N"
-        if instrument.useGlobals[pos]:
-            prompt %= ("off", "on")
-        else:
-            prompt %= ("on", "off")
-        if ui.get_binary_choice(prompt):
-            instrument.useGlobals[pos] = not instrument.useGlobals[pos]
+    for childType in ("Octaves", "Volumes", "Offsets"):
+        configure_child(database, instrument, childType, True)
 
     return instrument
 
@@ -245,40 +264,37 @@ def edit_offset(offset):
     """Let the user edit an existing Offset"""
 
     print("\nCurrently: %s" % offset.range_info())
-    getSA = ui.get_binary_choice("Change Sample Areas? Y/N")
-    getOV = ui.get_binary_choice("Change Offset Values? Y/N")
-    msgs = ("Enter the %s Sample Area in hex.",
+    prompts = ("Enter the %s Sample Area in hex.",
             "Enter the %s Offset Value in hex.")
 
-    if getSA:
-        offset.sampleArea[0] = ui.get_number(msgs[0] % "lowest", 0, 15, True)
-    if getOV:
-        offset.valueRange[0] = ui.get_number(msgs[1] % "lowest", 0, 255, True)
+    changeSA = ui.get_binary_choice("Change Sample Areas? Y/N")
+    if changeSA:
+        lowSA = ui.get_number(prompts[0] % "lowest", 0, 15, True)
+    changeOV = ui.get_binary_choice("Change Offset Values? Y/N")
+    if changeOV:
+        lowOV = ui.get_number(prompts[1] % "lowest", 0, 255, True)
 
-    if getSA:
-        low = offset.sampleArea[0]
-        if low == 15:
+    if changeSA:
+        if lowSA < 15:
+            highSA = ui.get_number(
+                prompts[0] % "highest", lowSA, 15, True)
+        else:
             print("You already entered the maximum value for a Sample Area, "
-                    "so it's being set to %s automatically." % (
-                        ui.convert_to_hex(low)))
-            offset.sampleArea[1] = low
-        else:
-            offset.sampleArea[1] = ui.get_number(
-                msgs[0] % "highest", low, 15, True)
+                    "so it's being set to %X automatically." % lowSA)
+            highSA = lowSA
+        offset.sampleArea = (lowSA, highSA)
 
-    if getOV:
-        if offset.sampleArea[0] == offset.sampleArea[1]:
-            low = offset.valueRange[0]
-            if low == 255:
-                print("You already entered the maximum value for this Value "
-                        "Range, so it's being set to %s automatically." % (
-                            ui.convert_to_hex(low)))
-                offset.valueRange[1] = low
-            else:
-                offset.valueRange[1] = ui.get_number(
-                    msgs[1] % "highest", low, 255, True)
+    if changeOV:
+        if offset.sampleArea[0] != offset.sampleArea[1]:
+            highOV = ui.get_number(
+                prompts[1] % "highest", 0, 255, True)
+        elif lowOV < 255:
+            highOV = ui.get_number(
+                prompts[1] % "highest", lowOV, 255, True)
         else:
-            offset.valueRange[1] = ui.get_number(
-                msgs[1] % "highest", 0, 255, True)
+            print("You already entered the maximum value for this Value "
+                    "Range, so it's being set to %X automatically." % lowOV)
+            highOV = lowOV
+        offset.valueRange = (lowOV, highOV)
 
     return offset

@@ -9,31 +9,39 @@ import os
 INFINITY = float("inf")
 
 
-def get_input(prompt, upper=True):
+def get_input(prompt, case="upper"):
     """Prompt user and return their response in uppercase"""
     response = raw_input("\n" + prompt + "\n").strip()
-    return response.upper() if upper else response
+    if case == "upper":
+        return response.upper()
+    elif case == "lower":
+        return response.lower()
+    else:
+        return response
 
 
-def get_choice(prompt, valid):
+def get_choice(prompt, valid, case="upper"):
     """Prompt the user until they enter a valid option"""
-    c = get_input(prompt)
-    while c not in valid:
-        print("You entered %s which is not a valid option." % c,
+    c = get_input(prompt, case)
+    while valid and c not in valid:
+        print("You entered \"%s\" which is not a valid option." % c,
                 "\nEnter one of %s." % valid)
-        c = get_input(prompt)
+        c = get_input(prompt, case)
     return c
 
 
-def get_binary_choice(prompt, valid=["Y", "N"], wanted="Y", skip=True):
+def get_binary_choice(prompt, valid=["Y", "N", "YES", "NO", ""], wanted="Y"):
     """
-    Get a response to a binary choice from the user
-    skip lets user skip choice by entering nothing, if true
+    Get a response to a binary choice from the user, where
+    the only test is whether or not they picked a specified option
+    This only compares the start of the input to the wanted input
+    if valid is an empty list, user can enter anything
+    Assumes uppercase for valid and wanted variables
     """
-    if skip:
-        valid = list(valid)
-        valid.append("")
-    return get_choice(prompt, valid).startswith(wanted)
+    if valid:
+        return get_choice(prompt, valid).startswith(wanted)
+    else:
+        return get_input(prompt).startswith(wanted)
 
 
 def get_mult_choice(prompt, valid, options, exit):
@@ -61,23 +69,23 @@ def make_mult_choice(prompt, options, exit="", default=False, single=False):
 
     bools = {}
     valid = []
-    for x, option in enumerate(options, 1):
-        prompt += "\n%s) %s" % (x, option)
-        x = str(x)
-        bools[x] = default
-        valid.append(x)
+    for n, option in enumerate(options, 1):
+        prompt += "\n%s) %s" % (n, option)
+        n = str(n)
+        bools[n] = default
+        valid.append(n)
 
     if single:
         chosen = get_choice(prompt, valid)
         # enumerate gave an offset of 1
-        return options[int(x) - 1]
+        return options[int(chosen) - 1]
     else:
         get_mult_choice(prompt, valid, bools, exit)
         chosen = []
-        for x, status in bools.items():
+        for i, status in bools.items():
             if status:
                 # enumerate gave an offset of 1
-                chosen.append(options[int(x) - 1])
+                chosen.append(options[int(i) - 1])
         return chosen
 
 

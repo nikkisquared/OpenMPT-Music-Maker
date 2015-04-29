@@ -54,7 +54,7 @@ def get_instrument(globalDB, channel):
 
     note = ""
     volume = ""
-    offsetValue = ""
+    offset = ""
     nextSA = channel.currentSA
     instrument = get_random_child(channel.instruments["local"],
         globalDB["Instruments"], channel.instruments["useGlobals"])
@@ -68,9 +68,12 @@ def get_instrument(globalDB, channel):
             number = instrument.number
             note += "%s%s" % (instrument_map[number / 10], number % 10)
         volume = get_volume(globalDB, instrument)
-        offset = get_offset(globalDB, instrument)
+        temp = get_offset(globalDB, instrument)
+        if temp:
+            nextSA = temp[0]
+            offset = temp[1]
 
-    return (note, volume, offsetValue), nextSA
+    return (note, volume, offset), nextSA
 
 
 def get_octave(globalDB, instrument):
@@ -80,8 +83,8 @@ def get_octave(globalDB, instrument):
     if octave is None:
         return ""
     else:
-        key = random.randint(0, len(octave.keys) - 1)
-        return "%s%s" % (octave.keys[key], octave.pitch)
+        pitch = random.randint(0, len(octave.pitches) - 1)
+        return "%s%s" % (octave.pitches[pitch], octave.number)
 
 
 def get_effect(globalDB, channel):
@@ -107,11 +110,14 @@ def get_volume(globalDB, source):
 
 
 def get_offset(globalDB, instrument):
-    """Return a random Offset for an Instrument"""
+    """
+    Return a random Sample Area and Offset Value for an Instrument
+    If none can be found, returns None
+    """
     offset = get_random_child(instrument.offsets["local"],
         globalDB["Offsets"], instrument.offsets["useGlobals"])
     if offset is None:
-        return ""
+        return None
     else:
         return format_offset(offset)
 
@@ -171,7 +177,11 @@ def init_channels(database):
 
     channels = []
 
-    for channel in database["Channels"]:
+    if len(database["Channels"]) > 127:
+        print("There are too many Channels available, OpenMPT only allows "
+            "up to 127. Channels after 127 will be cut off.")
+
+    for channel in database["Channels"][:127]:
         if channel.muted:
             continue
         channels.append(channel)
@@ -201,8 +211,8 @@ def get_lines_wanted(configLines):
     Prompt the user to enter a number of lines to write with
     as long as it's not defined in the config file already
     """
-    if configLines.isdigit():
-        lines = int(configLines)
+    if configLines:
+        lines = configLines
         print("Automatically writing %s lines from the config file." % lines)
     else:
         linesPrompt = "Enter how many lines you want to generate."

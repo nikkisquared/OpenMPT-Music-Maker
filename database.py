@@ -4,53 +4,47 @@ from __future__ import print_function
 
 """Functions for directly handling the database"""
 
+import os
+import copy
 import pickle
 
 import interface
 import structures
 import userinput as ui
 
-def print_db(database):
-    for key in database:
-        print("Looking at %s:" % key)
-        if type(database[key]) != list:
-            print("  %s" % database[key])
-        else:
-            for thing in database[key]:
-                print("  %r" % thing)
+
+def init_db(dbConfig=None):
+    """Initalize a new database, optionally using config file settings""" 
+    database = {"Channels": [], "Instruments": [], "Octaves": [],
+                "Effects": [], "Volumes": [], "Offsets": []}
+    database["Globals"] = copy.deepcopy(database)
+    if dbConfig and dbConfig["load"]:
+        load_db(database, dbConfig["load"])
+    return database
 
 
-def choose_structure():
-    """Prompts the user for a Structure type to act on"""
-    prompt = ("Choose a Structure Type:\n"
-                    "(C)hannel\t(I)nstrument\n"
-                    "(O)ctave\t(V)olume\n"
-                    "(E)ffect\t(F) Offset\n"
-                    "(B)ack")
-    valid = list("CIOVEFB")
-    return ui.get_choice(prompt, valid)
-
-
-def add_to_db(database, choice, title, useGlobals):
+def add_to_db(database, useGlobals, structType):
     """Let the user add a structure to a database"""
 
-    funcs = {"O": interface.make_octave, "V": interface.make_volume,
-            "E": interface.make_effect, "F": interface.make_offset}
+    functions = {
+        "Octaves": interface.make_octave, "Volumes": interface.make_volume,
+        "Effects": interface.make_effect, "Offsets": interface.make_offset}
 
-    print("\nMaking a %s." % title[:-1])
-    if choice == "C":
+    print("\nMaking a %s." % structType[:-1])
+    if structType == "Channels":
         new = interface.make_channel(database)
-    elif choice == "I":
+    elif structType == "Instruments":
         new = interface.make_instrument(database)
     else:
-        new = funcs[choice]()
+        new = functions[structType]()
+
     if useGlobals:
-        database["Globals"][title].append(new)
+        database["Globals"][structType].append(new)
     else:
-        database[title].append(new)
+        database[structType].append(new)
 
 
-def delete_from_db(database, choice, title, useGlobals):
+def delete_from_db(database, useGlobals, structType):
     """Let the user delete structures from the Database."""
 
     if useGlobals:
@@ -61,16 +55,23 @@ def delete_from_db(database, choice, title, useGlobals):
         globalNote = ""
 
     prompt = "Choose %s%s to delete. Press C to continue." % (
-        globalNote, title)
-    deleteThese = ui.make_mult_choice(prompt, db[title], "C")
+        globalNote, structType)
+    deleteThese = ui.make_mult_choice(prompt, db[structType], "C")
 
     for structure in deleteThese:
         interface.remove_all_links(structure)
-        db[title].remove(structure)
-    print("\nDeleted %s %s%s." % (len(deleteThese), globalNote, title))
+        db[structType].remove(structure)
+
+    deleted = len(deleteThese)
+    msg = "\nDeleted %s %s" % (deleted, globalNote)
+    if deleted == 1:
+        msg += structType[:-1] + "."
+    else:
+        msg += structType + "."
+    print(msg)
 
 
-def view_db(database, choice, title, useGlobals):
+def view_db(database, useGlobals, structType):
     """Let the user page through part of the database"""
 
     if useGlobals:
@@ -80,17 +81,19 @@ def view_db(database, choice, title, useGlobals):
         db = database
         globalNote = ""
 
-    pages = interface.paginate(db[title])
+    pages = interface.paginate(db[structType])
     if pages[0] == []:
         prompt = "There are no %s%s to view. Press any key to continue."
-        ui.get_input(prompt % (globalNote, title))
+        ui.get_input(prompt % (globalNote, structType))
         return None
 
     choice = ""
     curPage = 1
-    header = "\nViewing Page %s of " + globalNote + title
+    header = "\nViewing Page %s"
+    header += "/%s of %s%s" % (len(pages), globalNote, structType)
 
     while choice != "B":
+
         print(header % curPage)
         for item in pages[curPage - 1]:
             print(item)
@@ -98,71 +101,62 @@ def view_db(database, choice, title, useGlobals):
         prompt = ""
         valid = ["B"]
         if curPage > 1:
-            prompt += "Go to (P)revious Page\t"
+            prompt += "(P)revious, "
             valid.append("P")
-        prompt += "Go (B)ack" 
+        prompt += "(B)ack" 
         if curPage < len(pages):
-            prompt += "\tGo to (N)ext Page"
+            prompt += ", or (N)ext"
             valid.append("N")
+
         choice = ui.get_choice(prompt, valid)
+        if choice == "P":
+            curPage -= 1
+        if choice == "N":
+            curPage += 1
 
 
-def edit_db(database, choice, title, useGlobals):
+def edit_db(database, useGlobals, structType):
     """Let the user edit a structure in the database"""
 
-    funcs = {"O": interface.edit_octave, "V": interface.edit_volume,
-            "E": interface.edit_effect, "F": interface.edit_offset}
+    functions = {
+        "Octaves": interface.edit_octave,"Volumes": interface.edit_volume,
+        "Effects": interface.edit_effect, "Offsets": interface.edit_offset}
 
-    print("\nEditing a %s." % title[:-1])
-    prompt = "Choose a %s to edit." % title[:-1]
+    prompt = "Choose a %s to edit." % structType[:-1]
     db = database["Globals"] if useGlobals else database
-    structure = ui.make_mult_choice(prompt, db[title], single=True)
-    if choice == "C":
+    structure = ui.make_mult_choice(prompt, db[structType], single=True)
+
+    if structType == "Channels":
         interface.edit_channel(database, structure)
-    elif choice == "I":
+    elif structType == "Instruments":
         interface.edit_instrument(database, structure)
     else:
-        funcs[choice](structure)
+        functions[structType](structure)
 
 
 def arrange_db(database):
     """Must be given the root database"""
     prompt = "Do you want to move (T)o or (F)rom the Globals database?"
     valid = list("TF")
-    while True:
-        choice = choose_structure()
-        if choice == "B":
-            return None
-        where = get_choice(prompt, valid)
 
 
-def db_actions(action, database, useGlobals):
-    """Middle function for performing actions on the database"""
-
-    functions = {"A": add_to_db, "D": delete_from_db,
-                "V": view_db, "E": edit_db}
-    actions = {"A": "adding to %s database",
-                "D": "deleting from %s database",
-                "V": "viewing parts of %s database",
-                "E": "editing structures in %s database"}
-    titles = {"C": "Channels", "I": "Instruments", "O": "Octaves",
-                "V": "Volumes", "E": "Effects", "F": "Offsets"}
-    if useGlobals:
-        actions[action] %= "Globals"
-    else:
-        actions[action] %= "root"
-
-    choice = choose_structure()
-    while choice != "B":
-        functions[action](database, choice, titles[choice], useGlobals)
-        print("\nRepeating %s." % actions[action])
-        choice = choose_structure()
+def db_actions(database, useGlobals, args):
+    """Middle function for performing basic actions on the database"""
+    action = args[0]
+    structType = args[1]
+    if args[2]:
+        useGlobals = False if args[2] == "root" else True
+    functions = {"add": add_to_db, "delete": delete_from_db,
+                "view": view_db, "edit": edit_db}
+    functions[action](database, useGlobals, structType)
 
 
-def save_db(database, given, overwrite):
+def save_db(database, args, dbConfig):
     """Save the database to a file"""
+    filename = args[0]
+    overwrite = args[1]
     prompt = "Enter the name of the file to save to."
-    filename = ui.get_filename(prompt, 'w', given, overwrite)
+    filename = ui.get_filename(prompt, 'w', filename, overwrite)
     if filename:
         # pickle seems to not work well unless I do this?
         if filename in os.listdir("."):
@@ -187,7 +181,7 @@ def load_db(database, given=""):
     prompt = "(O)verwrite Database, or (A)ppend to it?"
     if given:
         print("Automatically appended database from %s." % filename)
-    if not given and ui.get_binary_choice(prompt, list("OA"), "O", False):
+    if not given and ui.get_binary_choice(prompt, list("OA"), "O"):
         print("Overwriting database.")
         database.update(newDatabase)
     else:

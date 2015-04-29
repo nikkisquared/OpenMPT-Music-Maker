@@ -11,7 +11,7 @@ def plural(value):
 class Channel(object):
 
     def __init__(self, instruments=[], volumes=[], effects=[],
-                overwrite=False, muted=False):
+                overwrite=True, muted=False):
 
         self.instruments = {"local": list(instruments), "useGlobals": False,
             "spacing": (0, 0), "curSpacing": 0}
@@ -38,17 +38,17 @@ class Channel(object):
         n = len(self.instruments["local"])
         info = "Uses %s Instrument%s%s " % (n, plural(n),
             " (G)" * self.instruments["useGlobals"])
-        info += "(%s-%s), " % self.instruments["spacing"]
+        info += "at %s-%s, " % self.instruments["spacing"]
         n = len(self.volumes["local"])
         info += "%s Volume%s%s " % (n, plural(n),
             " (G)" * self.volumes["useGlobals"])
-        info += "(%s-%s), " % self.volumes["spacing"]
+        info += "at %s-%s, " % self.volumes["spacing"]
         n = len(self.effects["local"])
         info += "and %s Effect%s%s " % (n, plural(n),
             " (G)" * self.effects["useGlobals"])
-        info += "(%s-%s). " % self.effects["spacing"]
+        info += "at %s-%s. " % self.effects["spacing"]
 
-        info += "Overwrite is %s. " % ("on" if self.overwrite else "off")
+        info += "Overwriting. " if self.overwrite else "Preserving. "
         info += "Muted." if self.muted else "In use."
 
         return info
@@ -79,7 +79,7 @@ class Instrument(object):
 
         if self.usedBy:
             n = len(self.usedBy)
-            info += "Used by %s Channels%s." % (n, plural(n))
+            info += "Used by %s Channel%s." % (n, plural(n))
         else:
             info += "Not in use."
 
@@ -88,20 +88,21 @@ class Instrument(object):
 
 class Octave(object):
 
-    def __init__(self, pitch=5,
-                keys=["C-", "C#", "D-", "D#", "E-", "F-",
-                    "F#", "G-", "G#", "A-", "A#", "B-"]):
-        self.pitch = pitch
-        self.keys = list(keys)
+    defaultPitches = ["C-", "C#", "D-", "D#", "E-", "F-",
+                    "F#", "G-", "G#", "A-", "A#", "B-"]
+
+    def __init__(self, number=5, pitches=defaultPitches):
+        self.number = number
+        self.pitches = list(pitches)
         self.usedBy = []
 
     def __str__(self):
-        info = "Pitch %s. " % self.pitch
+        info = "Pitch %s. " % self.number
         # compares the current keys to the full default
-        if self.keys == Octave.__init__.__defaults__[1]:
+        if self.pitches == self.defaultPitches:
             info += "It uses the full octave."
         else:
-            info += "It is limited to the %s keys." % (self.keys)
+            info += "It is limited to the %s pitches." % (self.pitches)
         if self.usedBy:
             n = len(self.usedBy)
             info += " Used by %s Instrument%s." % (n, plural(n))
@@ -123,14 +124,14 @@ class Effect(object):
         info = "Effect %s. " % self.effect
         vr = ("%X" % vr[0], "%X" % vr[1])
         if vr[0] == vr[1]:
-            info += "The value is always %s." % vr[0]
+            info += "The value is always %s. " % vr[0]
         else:
-            info += "The value range is %s to %s." % (vr[0], vr[1])
+            info += "The value range is %s to %s. " % (vr[0], vr[1])
         if self.usedBy:
             n = len(self.usedBy)
-            info += " Used by %s Channels%s." % (n, plural(n))
+            info += "Used by %s Channel%s." % (n, plural(n))
         else:
-            info += " Not in use."
+            info += "Not in use."
 
         return info
 
@@ -142,19 +143,19 @@ class Volume(Effect):
         self.usedBy = {"Channels": [], "Instruments": []}
 
     def __str__(self):
-        vr = self.valueRange
+
         info = "Volume Control %s. " % self.effect
+        vr = self.valueRange
         if vr[0] == vr[1]:
-            info += "The value is always %s." % vr[0]
+            info += "The value is always %s. " % vr[0]
         else:
-            info += "The value range is %s to %s." % (vr[0], vr[1])
-        if not self.usedBy["Channels"] or self.usedBy["Instruments"]:
-            info += " Not in use."
-        else:
-            n = len(self.usedBy["Channels"])
-            info += " Used by %s Channel%s, " % (n, plural(n))
-            n = len(self.usedBy["Instruments"])
-            info += " Used by %s Instrument%s." % (n, plural(n))
+            info += "The value range is %s to %s. " % (vr[0], vr[1])
+
+        n = len(self.usedBy["Channels"])
+        info += "Used by %s Channel%s, " % (n, plural(n))
+        n = len(self.usedBy["Instruments"])
+        info += "and %s Instrument%s." % (n, plural(n))
+
         return info
 
 
@@ -183,12 +184,12 @@ class Offset(Effect):
         sa = ("%X" % sa[0], "%X" % sa[1])
 
         if sa[0] == sa[1]:
-            info = "The Sample Area is always %s." % sa[0]
+            info = "The Sample Area is always %s. " % sa[0]
             if vr[0] == vr[1]:
-                info += " The Offset Value is always %s." % vr[0]
+                info += "The Offset Value is always %s." % vr[0]
             else:
-                info += " The Offset range is %s to %s." % (vr[0], vr[1])
+                info += "The Offset range is %s to %s." % (vr[0], vr[1])
         else:
-            info = " The Offset range is SA%s-O%02s to SA%s-O%02s." % (
+            info = "The Offset range is SA%s-O%02s to SA%s-O%02s." % (
                 sa[0], vr[0], sa[1], vr[1])
         return info

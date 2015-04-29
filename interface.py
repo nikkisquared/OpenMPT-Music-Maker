@@ -200,6 +200,16 @@ def edit_instrument(database, instrument):
     return instrument
 
 
+def get_octave_pitches(octave):
+    """Let the user specify what keys to use for an Octave"""
+    pitches = dict(list(structures.Octave.defaultPitches))
+    pitchReferences = {}
+    for row in ["QWERTYUIOP{}", "ASDFGHJKL;'\\", "ZXCVBNM<>?"]:
+        for i, char in enumerate(row):
+            pitchReferences[char] = i
+    valid = pitchReferences.keys()
+
+
 def make_octave():
     """Wrapper to let the user create an Octave"""
     return edit_octave(structures.Octave())
@@ -207,8 +217,8 @@ def make_octave():
 
 def edit_octave(octave):
     """Let the user edit an existing Octave"""
-    prompt = "Enter a pitch for the Octave. Currently it's %s."
-    octave.pitch = ui.get_number(prompt % octave.pitch, 0, 9)
+    prompt = "Enter the Octave number. Currently it's %s."
+    octave.number = ui.get_number(prompt % octave.number, 0, 9)
     prompt = "Change key limits? Y/N"
     if ui.get_binary_choice(prompt):
         #octave.keys = get_octave_keys()
@@ -229,9 +239,9 @@ def edit_volume(volume):
     volume.effect = ui.get_choice(prompt, list("VPABCDEFGH")).lower()
     high = 64 if volume.effect in "vp" else 9
     if high == 9 and volume.valueRange[1] > 9:
-        volume.valueRange[1] = 9
+        volume.valueRange = (0, 9)
     if volume.valueRange[0] > volume.valueRange[1]:
-        volume.valueRange[0] = volume.valueRange[1]
+        volume.valueRange = (volume.valueRange[1], volume.valueRange[1])
     volume.valueRange = ui.get_value_range(volume.valueRange, high, False)
     return volume
 

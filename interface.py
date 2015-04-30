@@ -173,13 +173,13 @@ def edit_channel(database, channel):
     if ui.get_binary_choice(prompt):
         channel.overwrite = not channel.overwrite
 
-    prompt = "%s the Channel? It's currently %s. Y/N"
-    if channel.muted:
-        prompt %= ("Unmute", "muted")
-    else:
-        prompt %= ("Mute", "unmuted")
-    if ui.get_binary_choice(prompt):
-        channel.muted = not channel.muted
+    # prompt = "%s the Channel? It's currently %s. Y/N"
+    # if channel.muted:
+    #     prompt %= ("Unmute", "muted")
+    # else:
+    #     prompt %= ("Mute", "unmuted")
+    # if ui.get_binary_choice(prompt):
+    #     channel.muted = not channel.muted
 
     return channel
 

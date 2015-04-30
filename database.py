@@ -13,7 +13,7 @@ import structures
 import userinput as ui
 
 
-def init_db(dbConfig=None):
+def init(dbConfig=None):
     """Initalize a new database, optionally using config file settings"""
     database = {}
     database["root"] = {"Channels": [], "Instruments": [], "Octaves": [],
@@ -22,11 +22,11 @@ def init_db(dbConfig=None):
     # global Channels do not do anything, and so cannot exist
     del database["global"]["Channels"]
     if dbConfig is not None and dbConfig["load"]:
-        load_db(database, dbConfig["load"])
+        load(database, dbConfig["load"], "init")
     return database
 
 
-def add_to_db(database, curDB, structType):
+def add_to(database, curDB, structType):
     """Let the user add a structure to a database"""
 
     functions = {
@@ -44,7 +44,7 @@ def add_to_db(database, curDB, structType):
     database[curDB][structType].append(new)
 
 
-def delete_from_db(database, curDB, structType):
+def delete_from(database, curDB, structType):
     """Let the user delete structures from the Database."""
 
     prompt = "Choose %s %s to delete. Press C to continue." % (
@@ -64,7 +64,7 @@ def delete_from_db(database, curDB, structType):
     print(msg)
 
 
-def view_db(database, curDB, structType):
+def view(database, curDB, structType):
     """Let the user page through part of the database"""
 
     pages = interface.paginate(database[curDB][structType])
@@ -101,7 +101,7 @@ def view_db(database, curDB, structType):
             curPage += 1
 
 
-def edit_db(database, curDB, structType):
+def edit(database, curDB, structType):
     """Let the user edit a structure in the database"""
 
     functions = {
@@ -120,63 +120,69 @@ def edit_db(database, curDB, structType):
         functions[structType](structure)
 
 
-def arrange_db(database):
+def basic_actions(database, curDB, action, structType, dbToUse=""):
+    """Middle function for performing basic actions on the database"""
+    if dbToUse and dbToUse != "default":
+        curDB = dbToUse
+    if curDB == "global" and structType == "Channels":
+        msg = "\nYou can't %s global Channels, as there can't be any."
+        print(msg % action)
+        return None
+    functions = {"add": add_to, "delete": delete_from,
+                "view": view, "edit": edit}
+    functions[action](database, curDB, structType)
+
+
+def arrange(database):
     """Must be given the root database"""
     prompt = "Do you want to move (T)o or (F)rom the global database?"
     valid = list("TF")
 
 
-def db_actions(database, curDB, args):
-    """Middle function for performing basic actions on the database"""
-    action = args[0]
-    structType = args[1]
-    dbToUse = args[2]
-    if dbToUse and dbToUse != "default":
-        curDB = dbToUse
-    functions = {"add": add_to_db, "delete": delete_from_db,
-                "view": view_db, "edit": edit_db}
-    functions[action](database, curDB, structType)
-
-
-def save_db(database, args, dbConfig):
+def save(database, dbConfig, filename="", overwrite=None):
     """Save the database to a file"""
-    filename = args[0]
-    overwrite = args[1]
+
+    if not filename:
+        filename = dbConfig["save"]
+        if overwrite is None:
+            overwrite = bool(dbConfig["overwrite"])
+
     prompt = "Enter the name of the file to save to."
     filename = ui.get_filename(prompt, 'w', filename, overwrite)
-    if filename:
-        # pickle seems to not work well unless I do this?
+    if not filename:
+        print("\nNo file to save to.")
+    else:
+        # pickle seems to not work well unless I do this(!)
         if filename in os.listdir("."):
             os.remove(filename)
         with open(filename, 'w') as outfile:
             pickle.dump(database, outfile)
-    else:
-        print("No file to save to.")
 
 
-def load_db(database, given=""):
+def load(database, filename="", mode=""):
     """Load a file into or over the database"""
 
     prompt = "Enter the name of a file to load from."
-    filename = ui.get_filename(prompt, 'r', given)
+    filename = ui.get_filename(prompt, 'r', filename)
     if not filename:
-        print("No file to load from.")
+        print("\nNo file to load from.")
         return None
     with open(filename, 'r') as infile:
         newDatabase = pickle.load(infile)
+    if not mode:
+        prompt = "Overwrite Database, or append to it?"
+        mode = ui.get_choice(prompt, ["overwrite", "append"], "lower")
 
-    prompt = "(O)verwrite Database, or (A)ppend to it?"
-    if given:
-        print("Automatically appended database from %s." % filename)
-    if not given and ui.get_binary_choice(prompt, list("OA"), "O"):
-        print("Overwriting database.")
+    if mode == "init":
+        print("\nAutomatically appended database from \"%s\"." % filename)
+    elif mode == "overwrite":
+        print("\nOverwriting database with \"%s\"." % filename)
         database.update(newDatabase)
-    else:
-        # temporary compatibility mode
-        structures = ("Instruments", "Octaves",
-                        "Effects", "Volumes", "Offsets")
+    elif mode == "append":
+        print("\nAppending database with \"%s\"." % filename)
         # only root DB gets Channels
-        database["root"]["Channels"] += newDatabase["Channels"]
-        for key in structures:
-            database["root"][key] += newDatabase[key]
+        database["root"]["Channels"] += newDatabase["root"]["Channels"]
+        structs = ("Instruments", "Octaves", "Effects", "Volumes", "Offsets")
+        for key in structs:
+            database["root"][key] += newDatabase["root"][key]
             database["global"][key] += newDatabase["global"][key]

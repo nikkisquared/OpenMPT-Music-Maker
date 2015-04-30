@@ -32,7 +32,7 @@ def get_choice(prompt, valid, case="upper"):
     """Prompt the user until they enter a valid option"""
     c = get_input(prompt, case)
     while valid and c not in valid:
-        print("You entered \"%s\" which is not a valid option." % c,
+        print("\nYou entered \"%s\" which is not a valid option." % c,
                 "\nEnter one of %s." % valid)
         c = get_input(prompt, case)
     return c
@@ -179,38 +179,53 @@ def get_value_range(current, high, getHex):
         return current
 
 
-def get_filename(prompt, mode, filename="", overwrite=False):
+def verify_filename(filename, mode, overwrite):
     """
-    Prompt the user to choose a file to read or write to,
-    returning the name of it
-    If the user declines to open any file, return a blank string
-    filename if specified will verify it for operations
-    overwrite if True will not ask before overwriting a file
+    Verify a file for writing or reading and return it on success
+    Return None if there is a problem and the user declines to try again
     """
 
-    existsPrompt = "File %s already exists. Overwrite? Y/N"
     againPrompt = "Pick a different file? Y/N"
-    choseFile = False
+    existsPrompt = "File %s already exists. Overwrite? Y/N"
+    found = filename in os.listdir(".")
 
-    while not choseFile:
-        if not filename:
-            filename = raw_input("\n" + prompt + "\n").strip()
-        found = filename in os.listdir(".")
+    if mode == 'r' and not found:
+        # if found:
+        #     print("\nReading from \"%s\"." % filename)
+        print("\"%s\" cannot be read as it doesn't exist." % filename)
+        filename = ""
+        if not get_binary_choice(againPrompt):
+            return None
 
-        if mode == 'r' and not found:
-            print("File %s cannot be read as it doesn't exist." % filename)
+    elif mode == 'w':
+        if not found:
+            print("\nWriting to \"%s\"." % filename)
+        elif overwrite:
+            print("\nAutomatically overwriting \"%s\"." % filename)
+        elif get_binary_choice(existsPrompt % filename):
+            print("\nOverwriting \"%s\"." % filename)
+        else:
+            filename = ""
             if not get_binary_choice(againPrompt):
                 return None
 
-        elif mode == 'w' and found:
-            if overwrite or get_binary_choice(existsPrompt % filename):
-                print("Overwriting %s." % filename)
-                choseFile = True
-            else:
-                filename = ""
-                if not get_binary_choice(againPrompt):
-                    return None
-        else:
-            choseFile = True
+    return filename
 
+
+def get_filename(prompt, mode, filename="", overwrite=False):
+    """
+    Prompt the user to choose a file to read or write to
+    Return the pathname for it
+    If the user declines to open any file, return a blank string
+    filename if specified will first verify it for operations
+    overwrite if True will not ask before overwriting a file
+    """
+    if filename:
+        filename = verify_filename(filename, mode, overwrite)
+    while not filename:
+        # user declined to try again in verify_filename
+        if filename is None:
+            return ""
+        filename = raw_input("\n" + prompt + "\n").strip()
+        filename = verify_filename(filename, mode, overwrite)
     return filename

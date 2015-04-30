@@ -21,11 +21,13 @@ def init_aliases():
         "run": ("run", "produce", "generate"),
         "toggle": ("toggle", "mute", "unmute"),
         "switch": ("switch", "workon", "cd"),
+        "global": ("global",),
+        "root": ("root",),
         "base": ("base", "number", "numeral"),
         "save": ("save", "backup"),
         "load": ("load", "restore"),
         "config": ("config", "ini"),
-        "wipe": ("wipe", "clear", "erase"),
+        "wipe": ("wipe", "erase"),
         # a ridiculous number of quit aliases exist just 'cause
         "quit": ("quit", "exit", "done", "part", "finished",
                 "goodbye", "bye", "no", "die",
@@ -123,16 +125,22 @@ def parse_entry(aliases, dbAliases, entry):
     if command == "help":
         # check first arg
         pass
+    elif command == "switch":
+        args = parse_args(args, [["root", "global"]])
+        if args[0]:
+            command = args[0]
     elif command == "database":
         args = parse_database_command(dbAliases, entry[0], args)
+    elif command == "load":
+        args = parse_args(args, [[], ["overwrite", "append"]])
+
     elif command == "save":
         args = parse_args(args, [[], ["overwrite", "safe", "safely"]])
         if args[1]:
             args[1] = bool(args[1] == "overwrite")
         else:
             args[1] = None
-    elif command == "load":
-        args = parse_args(args, [[], ["overwrite", "append"]])
+            
     elif command == "config":
         configOptions = ["view", "reset", "edit"]
         args = parse_args(args, [configOptions])
@@ -145,13 +153,28 @@ def parse_entry(aliases, dbAliases, entry):
     return command, args
 
 
+def change_database(curDB, command):
+    """Changes the database as requested"""
+    if curDB == command:
+        print("\nThe default database is already %s." % curDB)
+    else:
+        if command == "switch":
+            print('hello')
+            curDB = "global" if curDB == "root" else "root"
+        else:
+            curDB = command
+        print("\nThe default database is now %s." % curDB)
+    return curDB
+
+
 def main_menu():
     """Run the main menu of the program"""
 
     repeat = False
     numberBase = "default"
     curDB  = "root"
-    prompt = "Current Default Database: %s.\nEnter a valid command, or help."
+    prompt = ("Repeat is %s.\nCurrent Default Database: %s.\n"
+        "Enter a valid command, or help.")
 
     aliases, dbAliases = init_aliases()
     dbConfig, production = config.init_config_file()
@@ -159,25 +182,25 @@ def main_menu():
 
     command = ""
     while command != "quit":
-        entry = ui.get_input(prompt % curDB , "lower")
+        entry = ui.get_input(
+            prompt % (("on" if repeat else "off"), curDB), "lower")
         command, args = parse_entry(aliases, dbAliases, entry)
-        # print(command, args)
 
         if command == "help":
-            # try to grab whatever specific command there could be
-            args = parse_args(args, [[]])
             print("\nI'm working on the help file!!")
-        if command == "run":
+        elif command == "repeat":
+            repeat = not repeat
+            print("\nRepeat is now %s." % ("on" if repeat else "off"))
+        elif command == "run":
             tracker.produce(database, production)
-        elif command == "switch":
-            curDB = "global" if curDB == "root" else "root"
-            print("\nNow working on %s." % curDB)
+        elif command in ("switch", "root", "global"):
+            curDB = change_database(curDB, command)
         elif command == "database":
             db.basic_actions(database, curDB, *tuple(args))
-        elif command == "save":
-            db.save(database, dbConfig, *tuple(args))
         elif command == "load":
             db.load(database, *tuple(args))
+        elif command == "save":
+            db.save(database, dbConfig, *tuple(args))
         elif command == "wipe":
             wipePrompt = "Are you SURE you want to erase the database? Y/N"
             if ui.get_binary_choice(wipePrompt):

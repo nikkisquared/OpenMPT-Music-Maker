@@ -22,6 +22,7 @@ def init(dbConfig=None):
     # global Channels do not do anything, and so cannot exist
     del database["global"]["Channels"]
     if dbConfig is not None and dbConfig["load"]:
+        print("Trying to load database from file \"%s\"." % dbConfig["load"])
         load(database, dbConfig["load"], "init")
     return database
 

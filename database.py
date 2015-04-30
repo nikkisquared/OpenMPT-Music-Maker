@@ -14,16 +14,19 @@ import userinput as ui
 
 
 def init_db(dbConfig=None):
-    """Initalize a new database, optionally using config file settings""" 
-    database = {"Channels": [], "Instruments": [], "Octaves": [],
+    """Initalize a new database, optionally using config file settings"""
+    database = {}
+    database["root"] = {"Channels": [], "Instruments": [], "Octaves": [],
                 "Effects": [], "Volumes": [], "Offsets": []}
-    database["Globals"] = copy.deepcopy(database)
-    if dbConfig and dbConfig["load"]:
+    database["Global"] = copy.deepcopy(database["root"])
+    # global Channels do not do anything, and so cannot exist
+    del database["Global"]["Channels"]
+    if dbConfig is not None and dbConfig["load"]:
         load_db(database, dbConfig["load"])
     return database
 
 
-def add_to_db(database, useGlobals, structType):
+def add_to_db(database, curDB, structType):
     """Let the user add a structure to a database"""
 
     functions = {
@@ -38,32 +41,22 @@ def add_to_db(database, useGlobals, structType):
     else:
         new = functions[structType]()
 
-    if useGlobals:
-        database["Globals"][structType].append(new)
-    else:
-        database[structType].append(new)
+    database[curDB][structType].append(new)
 
 
-def delete_from_db(database, useGlobals, structType):
+def delete_from_db(database, curDB, structType):
     """Let the user delete structures from the Database."""
 
-    if useGlobals:
-        db = database["Globals"]
-        globalNote = "Global "
-    else:
-        db = database
-        globalNote = ""
+    prompt = "Choose %s %s to delete. Press C to continue." % (
+        curDB, structType)
+    toDelete = ui.make_mult_choice(prompt, database[curDB][structType], "C")
 
-    prompt = "Choose %s%s to delete. Press C to continue." % (
-        globalNote, structType)
-    deleteThese = ui.make_mult_choice(prompt, db[structType], "C")
-
-    for structure in deleteThese:
+    for structure in toDelete:
         interface.remove_all_links(structure)
-        db[structType].remove(structure)
+        database[curDB][structType].remove(structure)
 
-    deleted = len(deleteThese)
-    msg = "\nDeleted %s %s" % (deleted, globalNote)
+    deleted = len(toDelete)
+    msg = "\nDeleted %s %s" % (deleted, curDB)
     if deleted == 1:
         msg += structType[:-1] + "."
     else:
@@ -71,26 +64,19 @@ def delete_from_db(database, useGlobals, structType):
     print(msg)
 
 
-def view_db(database, useGlobals, structType):
+def view_db(database, curDB, structType):
     """Let the user page through part of the database"""
 
-    if useGlobals:
-        db = database["Globals"]
-        globalNote = "Global "
-    else:
-        db = database
-        globalNote = ""
-
-    pages = interface.paginate(db[structType])
+    pages = interface.paginate(database[curDB][structType])
     if pages[0] == []:
-        prompt = "There are no %s%s to view. Press any key to continue."
-        ui.get_input(prompt % (globalNote, structType))
+        prompt = "There are no %s %s to view. Press any key to continue."
+        ui.get_input(prompt % (curDB, structType))
         return None
 
     choice = ""
     curPage = 1
     header = "\nViewing Page %s"
-    header += "/%s of %s%s" % (len(pages), globalNote, structType)
+    header += "/%s of %s %s" % (len(pages), curDB, structType)
 
     while choice != "B":
 
@@ -115,7 +101,7 @@ def view_db(database, useGlobals, structType):
             curPage += 1
 
 
-def edit_db(database, useGlobals, structType):
+def edit_db(database, curDB, structType):
     """Let the user edit a structure in the database"""
 
     functions = {
@@ -123,8 +109,8 @@ def edit_db(database, useGlobals, structType):
         "Effects": interface.edit_effect, "Offsets": interface.edit_offset}
 
     prompt = "Choose a %s to edit." % structType[:-1]
-    db = database["Globals"] if useGlobals else database
-    structure = ui.make_mult_choice(prompt, db[structType], single=True)
+    structure = ui.make_mult_choice(prompt, database[curDB][structType],
+        single=True)
 
     if structType == "Channels":
         interface.edit_channel(database, structure)
@@ -136,19 +122,19 @@ def edit_db(database, useGlobals, structType):
 
 def arrange_db(database):
     """Must be given the root database"""
-    prompt = "Do you want to move (T)o or (F)rom the Globals database?"
+    prompt = "Do you want to move (T)o or (F)rom the Global database?"
     valid = list("TF")
 
 
-def db_actions(database, useGlobals, args):
+def db_actions(database, curDB, action, args):
     """Middle function for performing basic actions on the database"""
-    action = args[0]
-    structType = args[1]
-    if args[2]:
-        useGlobals = False if args[2] == "root" else True
+    structType = args[0]
+    dbToUse = args[1]
+    if dbToUse != "default":
+        curDB = dbToUse
     functions = {"add": add_to_db, "delete": delete_from_db,
                 "view": view_db, "edit": edit_db}
-    functions[action](database, useGlobals, structType)
+    functions[action](database, curDB, structType)
 
 
 def save_db(database, args, dbConfig):
@@ -185,8 +171,11 @@ def load_db(database, given=""):
         print("Overwriting database.")
         database.update(newDatabase)
     else:
-        structures = ("Channels", "Instruments", "Octaves",
+        # temporary compatibility mode
+        structures = ("Instruments", "Octaves",
                         "Effects", "Volumes", "Offsets")
+        # only root DB gets Channels
+        database["root"]["Channels"] += newDatabase["Channels"]
         for key in structures:
-            database[key] += newDatabase[key]
-            database["Globals"][key] += newDatabase["Globals"][key]
+            database["root"][key] += newDatabase[key]
+            database["Global"][key] += newDatabase["Global"][key]

@@ -139,7 +139,7 @@ def configure_child(database, parent, childType):
     if ui.get_binary_choice("Add %s? Y/N" % childType):
         chosen = ui.make_mult_choice(
             "Toggle %s to use. Press C to continue." % childType,
-            database[childType] + database["Globals"][childType], "C")
+            database["root"][childType] + database["Globals"][childType], "C")
         if chosen:
             add_children_to_parent(parent, chosen)
 

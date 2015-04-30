@@ -139,7 +139,7 @@ def configure_child(database, parent, childType):
     if ui.get_binary_choice("Add %s? Y/N" % childType):
         chosen = ui.make_mult_choice(
             "Toggle %s to use. Press C to continue." % childType,
-            database["root"][childType] + database["Globals"][childType], "C")
+            database["root"][childType] + database["global"][childType], "C")
         if chosen:
             add_children_to_parent(parent, chosen)
 
@@ -152,9 +152,9 @@ def configure_child(database, parent, childType):
             child["spacing"] = ui.get_range(prompts)
 
     prompt = "Turn %s global " + childType + "? It's currently %s. Y/N"
-    prompt %= ("off", "on") if child["useGlobals"] else ("on", "off")
+    prompt %= ("off", "on") if child["useglobal"] else ("on", "off")
     if ui.get_binary_choice(prompt):
-        child["useGlobals"] = not child["useGlobals"]
+        child["useglobal"] = not child["useglobal"]
 
 
 def make_channel(database):

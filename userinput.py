@@ -10,14 +10,22 @@ INFINITY = float("inf")
 
 
 def get_input(prompt, case="upper"):
-    """Prompt user and return their response in uppercase"""
+    """
+    Prompt user and return their response in desired case
+    case can be upper (default), lower, title, or preserve
+    Raise a ValueError if case is incorrect, to prevent unexpected bugs
+    """
     response = raw_input("\n" + prompt + "\n").strip()
     if case == "upper":
         return response.upper()
     elif case == "lower":
         return response.lower()
-    else:
+    elif case == "title":
+        return response.title()
+    elif case == "preserve":
         return response
+    else:
+        raise ValueError("Incorrect case given, potentially fatal.")
 
 
 def get_choice(prompt, valid, case="upper"):

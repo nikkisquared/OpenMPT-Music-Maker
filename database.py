@@ -18,9 +18,9 @@ def init_db(dbConfig=None):
     database = {}
     database["root"] = {"Channels": [], "Instruments": [], "Octaves": [],
                 "Effects": [], "Volumes": [], "Offsets": []}
-    database["Global"] = copy.deepcopy(database["root"])
+    database["global"] = copy.deepcopy(database["root"])
     # global Channels do not do anything, and so cannot exist
-    del database["Global"]["Channels"]
+    del database["global"]["Channels"]
     if dbConfig is not None and dbConfig["load"]:
         load_db(database, dbConfig["load"])
     return database
@@ -122,15 +122,16 @@ def edit_db(database, curDB, structType):
 
 def arrange_db(database):
     """Must be given the root database"""
-    prompt = "Do you want to move (T)o or (F)rom the Global database?"
+    prompt = "Do you want to move (T)o or (F)rom the global database?"
     valid = list("TF")
 
 
-def db_actions(database, curDB, action, args):
+def db_actions(database, curDB, args):
     """Middle function for performing basic actions on the database"""
-    structType = args[0]
-    dbToUse = args[1]
-    if dbToUse != "default":
+    action = args[0]
+    structType = args[1]
+    dbToUse = args[2]
+    if dbToUse and dbToUse != "default":
         curDB = dbToUse
     functions = {"add": add_to_db, "delete": delete_from_db,
                 "view": view_db, "edit": edit_db}
@@ -178,4 +179,4 @@ def load_db(database, given=""):
         database["root"]["Channels"] += newDatabase["Channels"]
         for key in structures:
             database["root"][key] += newDatabase[key]
-            database["Global"][key] += newDatabase["Global"][key]
+            database["global"][key] += newDatabase["global"][key]

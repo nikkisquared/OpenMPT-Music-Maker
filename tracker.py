@@ -33,14 +33,14 @@ def tick_spacing(child):
         return False
 
 
-def get_random_child(children, globalChildren, useGlobals):
+def get_random_child(children, globalChildren, useglobal):
     """
     Get a random child from a list of children, and
     optionally a list of global children
     If there are no children available, it returns None
     """
     possible = list(children)
-    if useGlobals:
+    if useglobal:
         for child in globalChildren:
             if child not in possible:
                 possible.append(child)
@@ -57,7 +57,7 @@ def get_instrument(globalDB, channel):
     offset = ""
     nextSA = channel.currentSA
     instrument = get_random_child(channel.instruments["local"],
-        globalDB["Instruments"], channel.instruments["useGlobals"])
+        globalDB["Instruments"], channel.instruments["useglobal"])
     instrument_map = list("0123456789:;<=>?@ABCDEFGHI")
 
     if instrument is not None:
@@ -79,7 +79,7 @@ def get_instrument(globalDB, channel):
 def get_octave(globalDB, instrument):
     """Return a random Octave for an Instrument"""
     octave = get_random_child(instrument.octaves["local"],
-            globalDB["Octaves"], instrument.octaves["useGlobals"])
+            globalDB["Octaves"], instrument.octaves["useglobal"])
     if octave is None:
         return ""
     else:
@@ -90,7 +90,7 @@ def get_octave(globalDB, instrument):
 def get_effect(globalDB, channel):
     """Return a random Effect for a Channel"""
     effect = get_random_child(channel.effects["local"],
-        globalDB["Effects"], channel.effects["useGlobals"])
+        globalDB["Effects"], channel.effects["useglobal"])
     if effect is None:
         return ""
     else:
@@ -101,7 +101,7 @@ def get_effect(globalDB, channel):
 def get_volume(globalDB, source):
     """Return a random Volume for a Channel or an Instrument"""
     volume = get_random_child(source.volumes["local"],
-        globalDB["Volumes"], source.volumes["useGlobals"])
+        globalDB["Volumes"], source.volumes["useglobal"])
     if volume is None:
         return ""
     else:
@@ -115,7 +115,7 @@ def get_offset(globalDB, instrument):
     If none can be found, returns None
     """
     offset = get_random_child(instrument.offsets["local"],
-        globalDB["Offsets"], instrument.offsets["useGlobals"])
+        globalDB["Offsets"], instrument.offsets["useglobal"])
     if offset is None:
         return None
     else:
@@ -143,6 +143,10 @@ def format_offset(offset):
 def get_channel_line(database, channel):
     """Generates a single line for a channel"""
 
+    # if the channel is muted, keep it in place without overwriting anything
+    if channel.muted:
+        return "|" + " " * 11
+
     space = "." if channel.overwrite else " "
     note = ""
     volume = ""
@@ -158,12 +162,12 @@ def get_channel_line(database, channel):
     if tick_spacing(channel.instruments) and channel.nextInstrument != "":
         note, volume, effect = channel.nextInstrument
         channel.nextInstrument, channel.nextSA = get_instrument(
-            database["Globals"], channel)
+            database["global"], channel)
 
     if not volume and tick_spacing(channel.volumes):
-        volume = get_volume(database["Globals"], channel)
+        volume = get_volume(database["global"], channel)
     if not effect and tick_spacing(channel.effects):
-        effect = get_effect(database["Globals"], channel)
+        effect = get_effect(database["global"], channel)
 
     line = "|"
     line += note or space * 5
@@ -177,17 +181,15 @@ def init_channels(database):
 
     channels = []
 
-    if len(database["Channels"]) > 127:
+    if len(database["root"]["Channels"]) > 127:
         print("There are too many Channels available, OpenMPT only allows "
-            "up to 127. Channels after 127 will be cut off.")
+            "up to 127. Channels after 127 will be ignored.")
 
-    for channel in database["Channels"][:127]:
-        if channel.muted:
-            continue
+    for channel in database["root"]["Channels"][:127]:
         channels.append(channel)
         channel.reset()
         channel.nextInstrument, channel.nextSA = get_instrument(
-            database["Globals"], channel)
+            database["global"], channel)
         for child in (channel.instruments, channel.volumes, channel.effects):
             tick_spacing(child)
 

@@ -13,11 +13,11 @@ class Channel(object):
     def __init__(self, instruments=[], volumes=[], effects=[],
                 overwrite=True, muted=False):
 
-        self.instruments = {"local": list(instruments), "useGlobals": False,
+        self.instruments = {"local": list(instruments), "useGlobal": False,
             "spacing": (0, 0), "curSpacing": 0}
-        self.volumes = {"local": list(volumes), "useGlobals": False,
+        self.volumes = {"local": list(volumes), "useGlobal": False,
             "spacing": (0, 0), "curSpacing": 0}
-        self.effects = {"local": list(effects), "useGlobals": False,
+        self.effects = {"local": list(effects), "useGlobal": False,
             "spacing": (0, 0), "curSpacing": 0}
         self.overwrite = overwrite
         self.muted = muted
@@ -37,15 +37,15 @@ class Channel(object):
 
         n = len(self.instruments["local"])
         info = "Uses %s Instrument%s%s " % (n, plural(n),
-            " (G)" * self.instruments["useGlobals"])
+            " (G)" * self.instruments["useGlobal"])
         info += "at %s-%s, " % self.instruments["spacing"]
         n = len(self.volumes["local"])
         info += "%s Volume%s%s " % (n, plural(n),
-            " (G)" * self.volumes["useGlobals"])
+            " (G)" * self.volumes["useGlobal"])
         info += "at %s-%s, " % self.volumes["spacing"]
         n = len(self.effects["local"])
         info += "and %s Effect%s%s " % (n, plural(n),
-            " (G)" * self.effects["useGlobals"])
+            " (G)" * self.effects["useGlobal"])
         info += "at %s-%s. " % self.effects["spacing"]
 
         info += "Overwriting. " if self.overwrite else "Preserving. "
@@ -58,9 +58,9 @@ class Instrument(object):
 
     def __init__(self, number=0, octaves=[], volumes=[], offsets=[]):
         self.number = number
-        self.octaves = {"local": list(octaves), "useGlobals": False}
-        self.volumes = {"local": list(volumes), "useGlobals": False}
-        self.offsets = {"local": list(offsets), "useGlobals": False}
+        self.octaves = {"local": list(octaves), "useGlobal": False}
+        self.volumes = {"local": list(volumes), "useGlobal": False}
+        self.offsets = {"local": list(offsets), "useGlobal": False}
         self.usedBy = []
 
     def __str__(self):
@@ -69,13 +69,13 @@ class Instrument(object):
 
         n = len(self.octaves["local"])
         info += "Uses %s Octave%s%s, " % (n, plural(n),
-            " (G)" * self.octaves["useGlobals"])
+            " (G)" * self.octaves["useGlobal"])
         n = len(self.volumes["local"])
         info += "%s Volume%s%s, " % (n, plural(n),
-            " (G)" * self.volumes["useGlobals"])
+            " (G)" * self.volumes["useGlobal"])
         n = len(self.offsets["local"])
         info += "and %s Offset%s%s. " % (n, plural(n),
-            " (G)" * self.offsets["useGlobals"])
+            " (G)" * self.offsets["useGlobal"])
 
         if self.usedBy:
             n = len(self.usedBy)

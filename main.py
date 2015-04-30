@@ -20,18 +20,19 @@ def init_aliases():
         "repeat": ("repeat", "redo"),
         "run": ("run", "produce", "generate"),
         "toggle": ("toggle", "mute", "unmute"),
-        "switch": ("switch", "workon"),
+        "switch": ("switch", "workon", "cd"),
         "base": ("base", "number", "numeral"),
         "save": ("save", "backup"),
         "load": ("load", "restore"),
         "config": ("config", "ini"),
         "wipe": ("wipe", "clear", "erase"),
         # a ridiculous number of quit aliases exist just 'cause
-        "quit": ("quit", "exit", "done", "part", "finish",
+        "quit": ("quit", "exit", "done", "part", "finished",
                 "goodbye", "bye", "no", "die",
                 "leave", "escape", "out", "over",
                 "explode", "crash", "overflow", "close",
-                "null", "void", "none", "infinity")}
+                "null", "void", "none", "infinity")
+    }
     dbAliases = {
         "add": ("add", "insert", "create"),
         "delete": ("delete", "remove", "destroy"),
@@ -41,6 +42,9 @@ def init_aliases():
         "unlink": ("unlink", "unchain", "unbind"),
         "move": ("move", "organize", "arrange", "rearrange")
     }
+    aliases["database"] = []
+    for terms in dbAliases.values():
+        aliases["database"] += list(terms)
 
     return aliases, dbAliases
 
@@ -85,16 +89,17 @@ def parse_database_command(dbAliases, command, givenArgs):
         args[0] = ui.get_choice(prompt, structNames, "lower")
     # only ask for a database if the user attempted to specify it
     if len(givenArgs) > 1 and not args[1]:
-        prompt = ("What database do you want to work on? "
-            "Global, root, or default.")
+        prompt = ("Which database do you mean? global, root, or default.")
         args[1] = ui.get_choice(prompt, dbNames, "lower")
 
     # ensures standardization with database naming
     if not args[0].endswith("s"):
         args[0] += "s"
     args[0] = args[0].title()
+    # makes sure the action is the first arg
+    args.insert(0, command)
 
-    return command, args
+    return args
 
 
 def parse_entry(aliases, dbAliases, entry):
@@ -111,23 +116,20 @@ def parse_entry(aliases, dbAliases, entry):
     args = entry[1:]
 
     # finds and applies master alias
-    for cmd in aliases.keys():
-        if command in aliases[cmd]:
+    for cmd, names in aliases.items():
+        if command in names:
             command = cmd
 
-    configOptions = ["view", "reset", "edit"]
-    loadOptions = ["overwrite", "append"]
-    saveSafe = ["safely", "safe", "no", "don't", False]
-    saveOverwrite = ["overwrite", "dangerously", True]
-
-    if command in dbAliases.keys():
-        command, args = parse_database_command(dbAliases, command, args)
+    if command == "database":
+        args = parse_database_command(dbAliases, entry[0], args)
 
     elif command == "save":
+        saveSafe = ["safely", "safe", "no", "don't", False]
+        saveOverwrite = ["overwrite", "dangerously", True]
         args = parse_args(args, [[], saveSafe + saveOverwrite])
         if not args[0]:
             prompt = "What file do you want to save to?"
-            args[0] = ui.get_input(prompt, "")
+            args[0] = ui.get_input(prompt, "preserve")
         if not args[1]:
             prompt = "Do you want to overwrite %s? Y/N" % args[0]
             args[1] = ui.get_binary_choice(prompt)
@@ -139,25 +141,27 @@ def parse_entry(aliases, dbAliases, entry):
             args[1] = False
 
     elif command == "load":
+        loadOptions = ["overwrite", "append"]
         args = parse_args(args, [[], loadOptions])
         if not args[0]:
             prompt = "What file do you want to load?"
-            args[0] = ui.get_input(prompt, "")
+            args[0] = ui.get_input(prompt, "preserve")
         if not args[1]:
             prompt = ("Do you want to append to or overwrite the database "
                 "with %s?" % args[0])
-            args[1] = ui.get_choice(prompt, loadOptions, "")
+            args[1] = ui.get_choice(prompt, loadOptions, "lower")
         if args[1] == "overwrite":
             print("\nOverwriting the database with %s." % args[0])
         elif args[1] == "append":
             print("\nAppending the database with %s." % args[0])
 
     elif command == "config":
+        configOptions = ["view", "reset", "edit"]
         args = parse_args(args, [configOptions])
         if not args[0]:
             prompt = ("\nWhat do you want to do to the config file? "
                 "View, reset, or edit it?")
-            arg[0] = ui.get_choice(prompt, configOptions)
+            arg[0] = ui.get_choice(prompt, configOptions, "lower")
         print("\nYou want to %s the config file!" % args[0])
 
     return command, args
@@ -181,7 +185,7 @@ def main_menu():
     command = ""
     while command != "quit":
         entry = ui.get_input(prompt % curDB , "lower")
-        command, args = parse_entry(aliases, entry)
+        command, args = parse_entry(aliases, dbAliases, entry)
         # print(command, args)
 
         if command == "help":
@@ -191,10 +195,10 @@ def main_menu():
         if command == "run":
             tracker.produce(database, production)
         elif command == "switch":
-            curDB = "Global" if curDB == "root" else "root"
+            curDB = "global" if curDB == "root" else "root"
             print("\nNow working on %s." % curDB)
         elif command == "database":
-            db.db_actions(database, curDB, command, args)
+            db.db_actions(database, curDB, args)
         elif command == "save":
             db.save_db(database, args, dbConfig)
         elif command == "wipe":
